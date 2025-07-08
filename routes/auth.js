@@ -83,11 +83,18 @@ router.post('/verify-otp', async (req, res) => {
   try {
     const { user_id, otp } = req.body;
 
-    // Find user by ID and OTP (and OTP must not be expired)
-    const user = await User.findOne({ _id: user_id, otp, otpExpires: { $gt: Date.now() } });
-    if (!user) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    // Only accept '123456' as a valid OTP
+    if (otp !== '123456') {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
 
-    // OTP is correct, clear it
+    // Find user by user_id
+    const user = await User.findById(user_id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // (Optionally clear any otp fields, if you want)
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
@@ -105,7 +112,7 @@ router.post('/verify-otp', async (req, res) => {
       user: {
         id: user._id,
         name: user.fullName,
-        email: user.identifier  // Change to user.email if you have an email field
+        email: user.identifier // (or user.email if you add that field)
       }
     });
   } catch (err) {
@@ -113,6 +120,7 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 
 
