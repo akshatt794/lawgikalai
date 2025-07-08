@@ -37,13 +37,28 @@ router.post('/signup', async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     const user = new User({ fullName, identifier, password: hash });
+
+    // Generate OTP and set expiration (10 min)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+
     await user.save();
-    res.json({ message: 'User registered successfully' });
+
+    // (Optional: send OTP by email here, or just log it for now)
+    console.log(`OTP for ${identifier}: ${otp}`);
+
+    res.json({
+      message: "Signup successful. OTP sent to email.",
+      user_id: user._id,
+      requires_verification: true
+    });
   } catch (err) {
-    console.error('Signup error:', err); // This will log the real error to Render logs!
+    console.error('Signup error:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 
 // FORGOT PASSWORD
