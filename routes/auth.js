@@ -80,19 +80,40 @@ router.post('/forgot-password', async (req, res) => {
 
 // VERIFY OTP
 router.post('/verify-otp', async (req, res) => {
-  const { otp } = req.body;
-  const user = await User.findOne({ otp, otpExpires: { $gt: Date.now() } });
-  if (!user) return res.status(400).json({ error: 'Invalid or expired OTP' });
+  try {
+    const { user_id, otp } = req.body;
 
-  user.otp = undefined;
-  user.otpExpires = undefined;
-  await user.save();
+    // Find user by ID and OTP (and OTP must not be expired)
+    const user = await User.findOne({ _id: user_id, otp, otpExpires: { $gt: Date.now() } });
+    if (!user) return res.status(400).json({ error: 'Invalid or expired OTP' });
 
-  res.json({ message: 'OTP verified' });
+    // OTP is correct, clear it
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your_jwt_secret',
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      message: "OTP verified successfully.",
+      token,
+      user: {
+        id: user._id,
+        name: user.fullName,
+        email: user.identifier  // Change to user.email if you have an email field
+      }
+    });
+  } catch (err) {
+    console.error('OTP verification error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
 });
-router.get('/ping', (req, res) => {
-  res.json({ status: 'ok' });
-});
+
 
 
 module.exports = router;
