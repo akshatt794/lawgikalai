@@ -12,16 +12,35 @@ function generateOTP() {
 
 // LOGIN
 router.post('/login', async (req, res) => {
-  const { identifier, password } = req.body;
-  const user = await User.findOne({ identifier });
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+  try {
+    const { identifier, password } = req.body;
+    const user = await User.findOne({ identifier });
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '8h' });
-  res.json({ token });
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your_jwt_secret',
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      message: "Login successful.",
+      token,
+      user: {
+        id: user._id,
+        name: user.fullName,
+        email: user.identifier // Change to user.email if you have that field
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
 });
+
 
 // SIGNUP
 // SIGNUP
