@@ -19,6 +19,12 @@ const PORT = process.env.PORT || 3000;
 app.get("/", (req, res) => {
   res.send("Welcome to Lawgikalai Auth API! 🚀");
 });
+// Top-level error handler (shows any uncaught errors)
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Something broke!', details: err.message });
+});
+
 
 app.listen(PORT, () => {
   console.log(`API server running on port ${PORT}`);

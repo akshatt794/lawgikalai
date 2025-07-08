@@ -75,5 +75,9 @@ router.post('/verify-otp', async (req, res) => {
 
   res.json({ message: 'OTP verified' });
 });
+router.get('/ping', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 
 module.exports = router;
