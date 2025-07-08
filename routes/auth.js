@@ -24,16 +24,27 @@ router.post('/login', async (req, res) => {
 });
 
 // SIGNUP
+// SIGNUP
 router.post('/signup', async (req, res) => {
-  const { fullName, identifier, password } = req.body;
-  const existing = await User.findOne({ identifier });
-  if (existing) return res.status(409).json({ error: 'User already exists' });
+  try {
+    const { fullName, identifier, password } = req.body;
+    if (!fullName || !identifier || !password) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
 
-  const hash = await bcrypt.hash(password, 10);
-  const user = new User({ fullName, identifier, password: hash });
-  await user.save();
-  res.json({ message: 'User registered successfully' });
+    const existing = await User.findOne({ identifier });
+    if (existing) return res.status(409).json({ error: 'User already exists' });
+
+    const hash = await bcrypt.hash(password, 10);
+    const user = new User({ fullName, identifier, password: hash });
+    await user.save();
+    res.json({ message: 'User registered successfully' });
+  } catch (err) {
+    console.error('Signup error:', err); // This will log the real error to Render logs!
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
 });
+
 
 // FORGOT PASSWORD
 router.post('/forgot-password', async (req, res) => {

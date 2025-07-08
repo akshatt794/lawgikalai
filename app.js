@@ -16,6 +16,10 @@ mongoose.connect(process.env.MONGODB_URI, {
 .catch((err) => console.error('MongoDB connection error:', err));
 
 const PORT = process.env.PORT || 3000;
+app.get("/", (req, res) => {
+  res.send("Welcome to Lawgikalai Auth API! 🚀");
+});
+
 app.listen(PORT, () => {
   console.log(`API server running on port ${PORT}`);
 });
