@@ -82,20 +82,30 @@ router.post('/signup', async (req, res) => {
 
 // FORGOT PASSWORD
 router.post('/forgot-password', async (req, res) => {
-  const { identifier } = req.body;
-  const user = await User.findOne({ identifier });
-  if (!user) return res.status(404).json({ error: 'User not found' });
+  try {
+    const { identifier } = req.body;
+    const user = await User.findOne({ identifier });
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const otp = generateOTP();
-  user.otp = otp;
-  user.otpExpires = Date.now() + 10 * 60 * 1000;
-  await user.save();
+    // Use static OTP for now
+    const otp = '123456';
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
 
-  // In production, send OTP via email or SMS
-  console.log(`OTP for ${identifier}: ${otp}`);
+    // (Pretend to send OTP via email)
+    console.log(`OTP for ${identifier}: ${otp}`);
 
-  res.json({ message: 'OTP sent' });
+    res.json({
+      message: "OTP sent to email.",
+      user_id: user._id
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
 });
+
 
 // VERIFY OTP
 router.post('/verify-otp', async (req, res) => {
