@@ -2,24 +2,23 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const authRoutes = require('./routes/auth');
-const app = express();
 const newsRoutes = require('./routes/news');
 const cors = require('cors');
 
-// Allow all origins (for dev)
+const app = express();
 
-
-// OR (more secure, allow only your frontend)
-// app.use(cors({ origin: "http://localhost:5173" }));
-app.use(cors());
-app.use(express.json());    // <<---- Move this UP
-app.use('/api/news', newsRoutes);
-app.use('/api/auth', authRoutes);
-
-app.use('/api/news', newsRoutes);
-
+// CORS: allow localhost (dev) and Netlify (prod)
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://lawgikalai-admin.netlify.app"
+  ],
+  credentials: true // Optional, only if you use cookies/auth
+}));
 
 app.use(express.json());
+
+app.use('/api/news', newsRoutes);
 app.use('/api/auth', authRoutes);
 
 // Connect to MongoDB using the URI from the .env file
@@ -39,7 +38,6 @@ app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Something broke!', details: err.message });
 });
-
 
 app.listen(PORT, () => {
   console.log(`API server running on port ${PORT}`);
