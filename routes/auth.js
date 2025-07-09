@@ -228,4 +228,16 @@ router.delete('/profile', auth, async (req, res) => {
   }
 });
 
+// GET ALL USERS (Protected, use only for admin panel)
+router.get('/all-users', auth, async (req, res) => {
+  try {
+    // Optional: Add admin-only check here in the future
+    const users = await User.find({}, "-password -otp -otpExpires"); // exclude sensitive fields
+    res.json({ users });
+  } catch (err) {
+    console.error('All users fetch error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
 module.exports = router;

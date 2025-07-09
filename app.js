@@ -3,6 +3,21 @@ const express = require('express');
 const mongoose = require('mongoose');
 const authRoutes = require('./routes/auth');
 const app = express();
+const newsRoutes = require('./routes/news');
+const cors = require('cors');
+
+// Allow all origins (for dev)
+
+
+// OR (more secure, allow only your frontend)
+// app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors());
+app.use(express.json());    // <<---- Move this UP
+app.use('/api/news', newsRoutes);
+app.use('/api/auth', authRoutes);
+
+app.use('/api/news', newsRoutes);
+
 
 app.use(express.json());
 app.use('/api/auth', authRoutes);
