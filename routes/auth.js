@@ -4,10 +4,19 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
 
-const JWT_SECRET = 'your_jwt_secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+// JWT authentication middleware
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: 'Missing token' });
+  const token = header.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
 // LOGIN
@@ -22,7 +31,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret',
+      JWT_SECRET,
       { expiresIn: '8h' }
     );
 
@@ -32,7 +41,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.fullName,
-        email: user.identifier // Change to user.email if you have that field
+        email: user.identifier // Change to user.email if you add that field
       }
     });
   } catch (err) {
@@ -41,8 +50,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-
-// SIGNUP
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
@@ -57,14 +64,14 @@ router.post('/signup', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const user = new User({ fullName, identifier, password: hash });
 
-    // Generate OTP and set expiration (10 min)
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Use static OTP for now
+    const otp = '123456';
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
 
     await user.save();
 
-    // (Optional: send OTP by email here, or just log it for now)
+    // (Pretend to send OTP by email here, or just log it for now)
     console.log(`OTP for ${identifier}: ${otp}`);
 
     res.json({
@@ -77,8 +84,6 @@ router.post('/signup', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
-
-
 
 // FORGOT PASSWORD
 router.post('/forgot-password', async (req, res) => {
@@ -106,7 +111,6 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-
 // VERIFY OTP
 router.post('/verify-otp', async (req, res) => {
   try {
@@ -131,7 +135,7 @@ router.post('/verify-otp', async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret',
+      JWT_SECRET,
       { expiresIn: '8h' }
     );
 
@@ -150,7 +154,78 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
+// RESEND OTP
+router.post('/resend-otp', async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const otp = '123456'; // static OTP for now
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
 
+    // (Pretend to send OTP via email)
+    console.log(`OTP for ${user.identifier}: ${otp}`);
+
+    res.json({ message: 'OTP resent to email.' });
+  } catch (err) {
+    console.error('Resend OTP error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// GET PROFILE
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      id: user._id,
+      name: user.fullName,
+      email: user.identifier // or user.email if you add it
+    });
+  } catch (err) {
+    console.error('Profile fetch error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// UPDATE PROFILE
+router.put('/profile', auth, async (req, res) => {
+  try {
+    const { fullName, identifier } = req.body;
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (fullName) user.fullName = fullName;
+    if (identifier) user.identifier = identifier;
+
+    await user.save();
+    res.json({
+      message: 'Profile updated',
+      user: {
+        id: user._id,
+        name: user.fullName,
+        email: user.identifier
+      }
+    });
+  } catch (err) {
+    console.error('Profile update error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// DELETE PROFILE
+router.delete('/profile', auth, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user.userId);
+    res.json({ message: 'Profile deleted' });
+  } catch (err) {
+    console.error('Profile delete error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
 
 module.exports = router;
