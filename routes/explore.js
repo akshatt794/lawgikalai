@@ -1,34 +1,49 @@
 const express = require('express');
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('cloudinary').v2;
 const Explore = require('../models/Explore');
+const path = require('path');
+
 const router = express.Router();
 
-// Cloudinary config (add your keys to .env)
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'explore_pdfs',
-    resource_type: 'raw', // allow pdf, doc, etc
-    format: async (req, file) => 'pdf',
-    public_id: (req, file) => Date.now() + '-' + file.originalname,
+// Setup Multer storage (compatible with Render and local)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // On Render use '/tmp', locally use 'uploads/'
+    const dest = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads/';
+    cb(null, dest);
   },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
 const upload = multer({ storage });
 
+// PDF Upload endpoint
 router.post('/upload', upload.single('pdf'), async (req, res) => {
-  const { title } = req.body;
-  if (!req.file || !title) return res.status(400).json({ error: "Missing PDF or title" });
-  const pdfUrl = req.file.path;
-  const explore = await Explore.create({ title, pdfUrl });
-  res.json({ message: "PDF uploaded!", data: explore });
+  try {
+    const { title } = req.body;
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    // Serve the correct path depending on environment
+    const isProd = process.env.NODE_ENV === 'production';
+    const pdfPath = isProd
+      ? `/uploads/${req.file.filename}`  // Render will serve /uploads route from /tmp
+      : `/uploads/${req.file.filename}`; // Locally as before
+
+    const doc = new Explore({ title, pdfUrl: pdfPath });
+    await doc.save();
+
+    res.json({ message: "Upload successful", data: doc });
+  } catch (err) {
+    console.error('Upload Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all PDFs
+router.get('/all', async (req, res) => {
+  const pdfs = await Explore.find();
+  res.json({ pdfs });
 });
 
 module.exports = router;

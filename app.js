@@ -20,7 +20,9 @@ app.use(cors({
 // 2. Parse JSON
 app.use(express.json());
 // Serve uploaded PDFs as static files
-app.use('/uploads', express.static('uploads'));
+
+// Serve the uploads folder (locally and on Render)
+app.use('/uploads', express.static(process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads'));
 
 
 // 3. Your API Routes (now ALL are after cors/json!)

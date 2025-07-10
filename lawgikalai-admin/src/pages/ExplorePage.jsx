@@ -11,7 +11,7 @@ export default function ExplorePage() {
     setMsg("");
     const formData = new FormData();
     formData.append("title", title);
-    formData.append("pdf", pdf);
+    formData.append("pdf", file);
 
     try {
       const token = localStorage.getItem("token");
