@@ -4,6 +4,16 @@ import Dashboard from "./pages/Dashboard";
 import UploadNews from "./pages/UploadNews";
 import AllNews from "./pages/AllNews";
 import Users from "./pages/Users";
+import ExplorePage from "./pages/ExplorePage";
+
+// No require('cors') or app.use() here!
+
+const navLinkStyle = {
+  color: "#2C2E34",
+  textDecoration: "none",
+  padding: "0 10px",
+  borderRadius: 6,
+};
 
 function Navbar() {
   return (
@@ -23,16 +33,10 @@ function Navbar() {
       <Link to="/upload-news" style={navLinkStyle}>Upload News</Link>
       <Link to="/all-news" style={navLinkStyle}>All News</Link>
       <Link to="/users" style={navLinkStyle}>Users</Link>
+      <Link to="/explore" style={navLinkStyle}>Explore</Link>
     </nav>
   );
 }
-
-const navLinkStyle = {
-  color: "#2C2E34",
-  textDecoration: "none",
-  padding: "0 10px",
-  borderRadius: 6,
-};
 
 function AppWithNavbar() {
   const location = useLocation();
@@ -47,6 +51,7 @@ function AppWithNavbar() {
         <Route path="/upload-news" element={<UploadNews />} />
         <Route path="/all-news" element={<AllNews />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/explore" element={<ExplorePage />} />
       </Routes>
     </>
   );
