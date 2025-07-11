@@ -5,9 +5,12 @@ const authRoutes = require('./routes/auth');
 const newsRoutes = require('./routes/news');
 const exploreRoutes = require('./routes/explore'); // <<-- move up!
 const cors = require('cors');
+const homeRoutes = require('./routes/home');
+
 
 const app = express();
 app.options('*', cors()); // Handle pre-flight requests for ALL routes
+app.use('/api/home', homeRoutes);
 
 app.use(cors({
   origin: [
