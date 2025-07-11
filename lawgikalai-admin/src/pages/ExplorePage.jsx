@@ -11,7 +11,7 @@ export default function ExplorePage() {
     setMsg("");
     const formData = new FormData();
     formData.append("title", title);
-    formData.append("pdf", file);
+    formData.append("pdf", pdf);   // <-- FIXED HERE
 
     try {
       const token = localStorage.getItem("token");
@@ -61,7 +61,7 @@ export default function ExplorePage() {
           background: "linear-gradient(90deg,#47b7ff,#8d6bff 90%)",
           color: "#fff", border: "none", borderRadius: 8, padding: "13px 0", fontSize: 17, fontWeight: 600, cursor: "pointer"
         }}>Upload</button>
-        {msg && <p style={{ color: "#8fffa7" }}>{msg}</p>}
+        {msg && <p style={{ color: msg.includes("success") ? "#8fffa7" : "#ff7b7b" }}>{msg}</p>}
       </form>
     </div>
   );

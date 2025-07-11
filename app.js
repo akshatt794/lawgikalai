@@ -7,6 +7,15 @@ const exploreRoutes = require('./routes/explore'); // <<-- move up!
 const cors = require('cors');
 
 const app = express();
+app.options('*', cors()); // Handle pre-flight requests for ALL routes
+
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://lawgikalai-admin.netlify.app"
+  ],
+  credentials: true
+}));
 
 // 1. CORS: allow localhost (dev) and Netlify (prod)
 app.use(cors({

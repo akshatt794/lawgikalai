@@ -192,28 +192,38 @@ router.get('/profile', auth, async (req, res) => {
   }
 });
 
-// UPDATE PROFILE
+// UPDATE PROFILE (fully updated for your requested fields)
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { fullName, identifier } = req.body;
+    const {
+      fullName,
+      mobileNumber,
+      email,
+      barCouncilId,
+      qualification,
+      experience,
+      practiceArea
+    } = req.body;
+
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'User not found', status: false });
 
     if (fullName) user.fullName = fullName;
-    if (identifier) user.identifier = identifier;
+    if (mobileNumber) user.mobileNumber = mobileNumber;
+    if (email) user.email = email;
+    if (barCouncilId) user.barCouncilId = barCouncilId;
+    if (qualification) user.qualification = qualification;
+    if (experience) user.experience = experience;
+    if (practiceArea) user.practiceArea = practiceArea;
 
     await user.save();
     res.json({
-      message: 'Profile updated',
-      user: {
-        id: user._id,
-        name: user.fullName,
-        email: user.identifier
-      }
+      message: 'Profile updated successfully',
+      status: true
     });
   } catch (err) {
     console.error('Profile update error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    res.status(500).json({ message: 'Failed to update profile', status: false });
   }
 });
 
