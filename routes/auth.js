@@ -177,20 +177,26 @@ router.post('/resend-otp', async (req, res) => {
 });
 
 // GET PROFILE
+// GET PROFILE
 router.get('/profile', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({
-      id: user._id,
-      name: user.fullName,
-      email: user.identifier // or user.email if you add it
+      fullName: user.fullName,
+      mobileNumber: user.mobileNumber,
+      email: user.email,                  // or user.identifier if you use identifier as email
+      barCouncilId: user.barCouncilId,
+      qualification: user.qualification,
+      experience: user.experience,
+      practiceArea: user.practiceArea,
     });
   } catch (err) {
     console.error('Profile fetch error:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // UPDATE PROFILE (fully updated for your requested fields)
 router.put('/profile', auth, async (req, res) => {
