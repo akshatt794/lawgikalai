@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   password: String,
   otp: String,
   otpExpires: Date,
+  savedNews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'News' }] // <--- Add this line
 });
 
 module.exports = mongoose.model('User', userSchema);

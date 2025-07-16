@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
+const Case = require('../models/Case');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
@@ -258,6 +259,22 @@ router.get('/all-users', auth, async (req, res) => {
   } catch (err) {
     console.error('All users fetch error:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// Add Case API
+router.post('/add', /*auth,*/ async (req, res) => {
+  try {
+    const caseData = req.body;
+    const newCase = new Case(caseData);
+    await newCase.save();
+    res.json({
+      message: 'Case added successfully',
+      status: true,
+      case: newCase,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to add case', status: false, error: err.message });
   }
 });
 
