@@ -1,0 +1,38 @@
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const router = express.Router();
+
+// Set storage for documents
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/documents/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
+
+// Document Upload API
+router.post('/upload-document', upload.single('document'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No document uploaded' });
+  }
+
+  // Adjust BASE_URL if deploying
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  const fileUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
+
+  res.json({
+    documents: [
+      {
+        file_name: req.file.originalname,
+        file_url: fileUrl
+      }
+    ],
+    message: "Document uploaded successfully!"
+  });
+});
+
+module.exports = router;
