@@ -4,7 +4,10 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
 const Case = require('../models/Case');
+const News = require('../models/News');
 
+
+// JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // JWT authentication middleware
@@ -177,65 +180,79 @@ router.post('/resend-otp', async (req, res) => {
   }
 });
 
-// GET PROFILE
-// GET PROFILE
 // GET PROFILE (returns all requested fields)
 router.get('/profile', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select(
-      'fullName mobileNumber email barCouncilId qualification experience practiceArea'
-    );
+    const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    res.json({
-      fullName: user.fullName || "",
-      mobileNumber: user.mobileNumber || "",
-      email: user.email || "",
-      barCouncilId: user.barCouncilId || "",
-      qualification: user.qualification || "",
-      experience: user.experience || "",
-      practiceArea: user.practiceArea || []
+    // Default string fields to 'NIL' if empty or not present
+    const result = {
+      full_name: user.fullName || "NIL",
+      mobile_number: user.mobileNumber || "NIL",
+      email: user.email || "NIL",
+      bar_council_id: user.barCouncilId || "NIL",
+      qualification: user.qualification || "NIL",
+      experience: user.experience || "NIL",
+    };
+
+    // Practice Areas as booleans, false if not present or not true
+    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "Income Tax"];
+    result.practice_areas = {};
+    possibleAreas.forEach(area => {
+      // If not set, default to false
+      result.practice_areas[area] = user.practiceArea && user.practiceArea.includes(area) ? true : false;
     });
+
+    res.json(result);
+
   } catch (err) {
-    console.error('Profile fetch error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 
-
-// UPDATE PROFILE (fully updated for your requested fields)
+// UPDATE PROFILE (accepts the new format with practice_areas object)
 router.put('/profile', auth, async (req, res) => {
   try {
     const {
-      fullName,
-      mobileNumber,
+      full_name,
+      mobile_number,
       email,
-      barCouncilId,
+      bar_council_id,
       qualification,
       experience,
-      practiceArea
+      practice_areas
     } = req.body;
 
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ message: 'User not found', status: false });
+    // Convert practice_areas object to an array of true fields
+    let practiceAreaArray = [];
+    if (practice_areas && typeof practice_areas === 'object') {
+      Object.entries(practice_areas).forEach(([area, checked]) => {
+        if (checked) practiceAreaArray.push(area);
+      });
+    }
 
-    if (fullName) user.fullName = fullName;
-    if (mobileNumber) user.mobileNumber = mobileNumber;
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found", status: false });
+
+    // Update fields
+    if (full_name) user.fullName = full_name;
+    if (mobile_number) user.mobileNumber = mobile_number;
     if (email) user.email = email;
-    if (barCouncilId) user.barCouncilId = barCouncilId;
+    if (bar_council_id) user.barCouncilId = bar_council_id;
     if (qualification) user.qualification = qualification;
     if (experience) user.experience = experience;
-    if (practiceArea) user.practiceArea = practiceArea;
+    if (practiceAreaArray.length) user.practiceArea = practiceAreaArray;
 
     await user.save();
+
     res.json({
-      message: 'Profile updated successfully',
+      message: "Profile updated successfully",
       status: true
     });
   } catch (err) {
-    console.error('Profile update error:', err);
-    res.status(500).json({ message: 'Failed to update profile', status: false });
+    res.status(500).json({ message: "Failed to update profile", status: false });
   }
 });
 
@@ -275,6 +292,24 @@ router.post('/add', /*auth,*/ async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to add case', status: false, error: err.message });
+  }
+});
+
+// Save News (Bookmark)
+router.post('/save/:newsId', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Prevent duplicate saves
+    if (!user.savedNews.includes(req.params.newsId)) {
+      user.savedNews.push(req.params.newsId);
+      await user.save();
+    }
+
+    res.json({ message: 'News saved' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 

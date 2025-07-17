@@ -6,6 +6,9 @@ const newsRoutes = require('./routes/news');
 const exploreRoutes = require('./routes/explore'); // <<-- move up!
 const cors = require('cors');
 const homeRoutes = require('./routes/home');
+const caseRoutes = require('./routes/case');
+
+app.use('/api/case', caseRoutes);
 
 
 const app = express();
