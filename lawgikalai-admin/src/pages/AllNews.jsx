@@ -35,9 +35,15 @@ export default function AllNews() {
             <div key={item._id} style={newsCardStyle}>
               <h3 style={{ color: "#6ad7f9", marginBottom: 12 }}>{item.title}</h3>
               <div style={{ color: "#e2eafc", marginBottom: 16, minHeight: 44 }}>{item.content}</div>
+              
+              {/* Show image if available, use absolute URL if needed */}
               {item.image && (
                 <img
-                  src={item.image}
+                  src={
+                    item.image.startsWith("http")
+                      ? item.image
+                      : `${API_URL}${item.image.startsWith("/") ? "" : "/"}${item.image}`
+                  }
                   alt="news"
                   style={{
                     width: "100%",
@@ -48,6 +54,7 @@ export default function AllNews() {
                   }}
                 />
               )}
+              
               <div style={{ fontSize: 12, color: "#a5b9df", textAlign: "right" }}>
                 {new Date(item.createdAt).toLocaleString()}
               </div>
@@ -125,3 +132,4 @@ const spinnerCSS = `
   100% { transform: rotate(360deg);}
 }
 `;
+

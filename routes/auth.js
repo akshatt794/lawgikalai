@@ -197,7 +197,7 @@ router.get('/profile', auth, async (req, res) => {
     };
 
     // Practice Areas as booleans, false if not present or not true
-    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "Income Tax"];
+    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "Income_Tax"];
     result.practice_areas = {};
     possibleAreas.forEach(area => {
       // If not set, default to false
