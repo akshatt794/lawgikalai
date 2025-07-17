@@ -2,7 +2,13 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const router = express.Router();
+const fs = require('fs'); // <-- add this
 
+// === Step 2: Create uploads/documents folder if not exists ===
+const documentsDir = path.join(__dirname, '..', 'uploads', 'documents');
+if (!fs.existsSync(documentsDir)) {
+  fs.mkdirSync(documentsDir, { recursive: true });
+}
 // Set storage for documents
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
