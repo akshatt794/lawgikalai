@@ -1,27 +1,23 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
+
+// Route imports
 const authRoutes = require('./routes/auth');
 const newsRoutes = require('./routes/news');
-const exploreRoutes = require('./routes/explore'); // <<-- move up!
-const cors = require('cors');
+const exploreRoutes = require('./routes/explore');
 const homeRoutes = require('./routes/home');
 const caseRoutes = require('./routes/case');
-const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 const documentRoutes = require('./routes/document');
 const ordersRoutes = require('./routes/orders');
 
-
+// Serve correct uploads directory (tmp for production on Render)
+const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
 const app = express();
-app.options('*', cors()); // Handle pre-flight requests for ALL routes
-app.use('/api/home', homeRoutes);
-app.use('/api/case', require('./routes/case'));
-app.use('/api/case', caseRoutes);
-app.use('/uploads', express.static('uploads'));
-app.use('/uploads', express.static(servePath));
-app.use('/api', documentRoutes);
-app.use('/api/orders', ordersRoutes);
+
+// 1. CORS (VERY TOP)
 app.use(cors({
   origin: [
     "http://localhost:5173",
@@ -30,29 +26,27 @@ app.use(cors({
   credentials: true
 }));
 
-// 1. CORS: allow localhost (dev) and Netlify (prod)
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://lawgikalai-admin.netlify.app"
-  ],
-  credentials: true // Optional, only if you use cookies/auth
-}));
-
 // 2. Parse JSON
 app.use(express.json());
-// Serve uploaded PDFs as static files
 
-// Serve the uploads folder (locally and on Render)
-app.use('/uploads', express.static(process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads'));
+// 3. Serve uploads folder as static (PDF/image access)
+app.use('/uploads', express.static(servePath));
 
-
-// 3. Your API Routes (now ALL are after cors/json!)
+// 4. API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/explore', exploreRoutes);
+app.use('/api/home', homeRoutes);
+app.use('/api/case', caseRoutes);
+app.use('/api', documentRoutes);
+app.use('/api/orders', ordersRoutes);
 
-// Connect to MongoDB using the URI from the .env file
+// 5. Base route
+app.get("/", (req, res) => {
+  res.send("Welcome to Lawgikalai Auth API! 🚀");
+});
+
+// 6. MongoDB Connect
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -60,18 +54,13 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('MongoDB connected'))
 .catch((err) => console.error('MongoDB connection error:', err));
 
-const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => {
-  res.send("Welcome to Lawgikalai Auth API! 🚀");
-});
-
-// Top-level error handler (shows any uncaught errors)
+// 7. Top-level error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Something broke!', details: err.message });
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API server running on port ${PORT}`);
 });
