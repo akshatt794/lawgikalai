@@ -7,6 +7,7 @@ const exploreRoutes = require('./routes/explore'); // <<-- move up!
 const cors = require('cors');
 const homeRoutes = require('./routes/home');
 const caseRoutes = require('./routes/case');
+const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
 
 
@@ -15,6 +16,8 @@ app.options('*', cors()); // Handle pre-flight requests for ALL routes
 app.use('/api/home', homeRoutes);
 app.use('/api/case', require('./routes/case'));
 app.use('/api/case', caseRoutes);
+app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(servePath));
 
 app.use(cors({
   origin: [

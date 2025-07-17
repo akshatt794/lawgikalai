@@ -5,21 +5,29 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
+// JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-// ===== Multer setup (must be before first use of upload!) =====
+// ----------- Dynamic Upload Directory Setup -----------
+// Choose upload directory based on environment
+const UPLOAD_DIR = process.env.NODE_ENV === 'production' ? '/tmp/uploads/news' : 'uploads/news';
+// Ensure the directory exists (creates it if it doesn't)
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+// Multer storage config
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/news/');
+    cb(null, UPLOAD_DIR);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname)); // unique filename
+    cb(null, Date.now() + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-// ===== JWT authentication middleware =====
+// JWT authentication middleware
 function auth(req, res, next) {
   const header = req.headers.authorization;
   if (!header) return res.status(401).json({ error: 'Missing token' });
@@ -32,13 +40,13 @@ function auth(req, res, next) {
   }
 }
 
-// ===== Middleware: Only allow if user is Admin (for now allow all) =====
+// Middleware: Only allow if user is Admin (for now, allow all)
 function adminOnly(req, res, next) {
-  // (Implement your admin check logic here if needed)
+  // You can add role-check logic here if needed
   return next();
 }
 
-// ===== Upload News (Admin only) =====
+// ========== Upload News (Admin only) ==========
 // POST /api/news/upload
 router.post('/upload', upload.single('image'), async (req, res) => {
   try {
@@ -48,17 +56,18 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     const news = new News({
       title,
       content,
-      image: imageUrl, // store path in db
+      image: imageUrl,
     });
     await news.save();
 
     res.json({ message: "News uploaded!", news });
   } catch (err) {
+    console.error("Upload error:", err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
 
-// ===== Get All News =====
+// ========== Get All News ==========
 router.get('/all', async (req, res) => {
   try {
     const news = await News.find().sort({ createdAt: -1 });
@@ -68,7 +77,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// ===== Save News (bookmark) =====
+// ========== Save News (bookmark) ==========
 router.post('/save', auth, async (req, res) => {
   try {
     const { newsId } = req.body;
@@ -88,7 +97,7 @@ router.post('/save', auth, async (req, res) => {
   }
 });
 
-// ===== Get Saved News =====
+// ========== Get Saved News ==========
 router.get('/saved', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).populate('savedNews');
