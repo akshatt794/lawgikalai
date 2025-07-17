@@ -8,13 +8,13 @@ const cors = require('cors');
 const homeRoutes = require('./routes/home');
 const caseRoutes = require('./routes/case');
 
-app.use('/api/case', caseRoutes);
 
 
 const app = express();
 app.options('*', cors()); // Handle pre-flight requests for ALL routes
 app.use('/api/home', homeRoutes);
 app.use('/api/case', require('./routes/case'));
+app.use('/api/case', caseRoutes);
 
 app.use(cors({
   origin: [
