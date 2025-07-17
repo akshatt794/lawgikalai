@@ -5,6 +5,7 @@ import UploadNews from "./pages/UploadNews";
 import AllNews from "./pages/AllNews";
 import Users from "./pages/Users";
 import ExplorePage from "./pages/ExplorePage";
+import UploadOrders from "./pages/UploadOrders"; // Adjust path as needed
 
 // No require('cors') or app.use() here!
 
@@ -34,6 +35,8 @@ function Navbar() {
       <Link to="/all-news" style={navLinkStyle}>All News</Link>
       <Link to="/users" style={navLinkStyle}>Users</Link>
       <Link to="/explore" style={navLinkStyle}>Explore</Link>
+      <Link to="/orders-upload">Upload Orders</Link>
+
     </nav>
   );
 }
@@ -52,6 +55,7 @@ function AppWithNavbar() {
         <Route path="/all-news" element={<AllNews />} />
         <Route path="/users" element={<Users />} />
         <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/orders-upload" element={<UploadOrders />} />
       </Routes>
     </>
   );
