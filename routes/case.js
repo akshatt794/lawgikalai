@@ -13,6 +13,46 @@ router.post('/add', async (req, res) => {
     res.status(500).json({ error: "Something broke!", details: err.message });
   }
 });
+// JWT middleware
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: 'Missing token' });
+  const token = header.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+// 1. Get case list of user
+router.get('/list', auth, async (req, res) => {
+  try {
+    const cases = await Case.find({ createdBy: req.user.userId }).sort({ filing_date: -1 });
+    res.json({ cases });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch cases", details: err.message });
+  }
+});
+
+// 2. Edit a case by ID (must belong to user)
+router.put('/:caseId', auth, async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const updated = await Case.findOneAndUpdate(
+      { _id: caseId, createdBy: req.user.userId },
+      { $set: req.body },
+      { new: true }
+    );
+    if (!updated)
+      return res.status(404).json({ error: "Case not found or not allowed" });
+    res.json({ message: "Case updated", case: updated });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update case", details: err.message });
+  }
+});
+
 
 // (You can add more case routes here...)
 
