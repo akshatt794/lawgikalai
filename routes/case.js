@@ -29,10 +29,12 @@ function auth(req, res, next) {
 // 1. Get case list of user
 router.get('/list', auth, async (req, res) => {
   try {
-    const cases = await Case.find({ createdBy: req.user.userId }).sort({ filing_date: -1 });
+    // If you store userId in Case model, filter by req.user.userId
+    // Otherwise, return all cases
+    const cases = await Case.find({ user: req.user.userId }); // adjust filter as per your model
     res.json({ cases });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch cases", details: err.message });
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
