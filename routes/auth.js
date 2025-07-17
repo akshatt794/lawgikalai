@@ -215,46 +215,71 @@ router.get('/profile', auth, async (req, res) => {
 // UPDATE PROFILE (accepts the new format with practice_areas object)
 router.put('/profile', auth, async (req, res) => {
   try {
+    // Constants for practice area fields
+const ALL_PRACTICE_AREAS = [
+  "Criminal",
+  "Civil",
+  "Family",
+  "Property",
+  "Corporate",
+  "Income Tax"
+];
+
+router.put('/profile', auth, async (req, res) => {
+  try {
     const {
-      full_name,
-      mobile_number,
+      fullName,
+      mobileNumber,
       email,
-      bar_council_id,
+      barCouncilId,
       qualification,
       experience,
-      practice_areas
+      practiceArea,     // Array (optional)
+      practice_areas    // Object (optional)
     } = req.body;
-
-    // Convert practice_areas object to an array of true fields
-    let practiceAreaArray = [];
-    if (practice_areas && typeof practice_areas === 'object') {
-      Object.entries(practice_areas).forEach(([area, checked]) => {
-        if (checked) practiceAreaArray.push(area);
-      });
-    }
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: "User not found", status: false });
 
-    // Update fields
-    if (full_name) user.fullName = full_name;
-    if (mobile_number) user.mobileNumber = mobile_number;
+    if (fullName) user.fullName = fullName;
+    if (mobileNumber) user.mobileNumber = mobileNumber;
     if (email) user.email = email;
-    if (bar_council_id) user.barCouncilId = bar_council_id;
+    if (barCouncilId) user.barCouncilId = barCouncilId;
     if (qualification) user.qualification = qualification;
     if (experience) user.experience = experience;
-    if (practiceAreaArray.length) user.practiceArea = practiceAreaArray;
+
+    // Accept either format for practice area:
+    let practiceAreaArray = user.practiceArea || [];
+    if (Array.isArray(practiceArea)) {
+      practiceAreaArray = practiceArea;
+    } else if (practice_areas && typeof practice_areas === 'object') {
+      // Convert object {Civil:true,...} to array
+      practiceAreaArray = [];
+      for (let area of ALL_PRACTICE_AREAS) {
+        if (practice_areas[area]) practiceAreaArray.push(area);
+      }
+    }
+    user.practiceArea = practiceAreaArray;
 
     await user.save();
 
+    // Always return practiceArea as array and practice_areas as object (with all fields)
+    const resultPracticeAreas = {};
+    for (let area of ALL_PRACTICE_AREAS) {
+      resultPracticeAreas[area] = user.practiceArea.includes(area);
+    }
+
     res.json({
       message: "Profile updated successfully",
-      status: true
+      status: true,
+      practiceArea: user.practiceArea,        // array
+      practice_areas: resultPracticeAreas     // object
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to update profile", status: false });
   }
 });
+
 
 // DELETE PROFILE
 router.delete('/profile', auth, async (req, res) => {

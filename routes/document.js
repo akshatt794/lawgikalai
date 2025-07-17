@@ -27,7 +27,7 @@ router.post('/upload-document', upload.single('document'), (req, res) => {
   }
 
   // Adjust BASE_URL if deploying
-  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.BASE_URL || 'https://lawgikalai-admin.netlify.app';
   const fileUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
 
   res.json({
