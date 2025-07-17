@@ -52,7 +52,21 @@ router.put('/:caseId', auth, async (req, res) => {
     res.status(500).json({ error: "Failed to update case", details: err.message });
   }
 });
+// GET CASE DETAILS BY ID
+router.get('/:caseId', /*auth,*/ async (req, res) => {
+  try {
+    const caseId = req.params.caseId;
+    const caseDetails = await Case.findById(caseId);
 
+    if (!caseDetails) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    res.json(caseDetails);
+  } catch (err) {
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
 
 // (You can add more case routes here...)
 
