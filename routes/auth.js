@@ -213,9 +213,7 @@ router.get('/profile', auth, async (req, res) => {
 
 
 // UPDATE PROFILE (accepts the new format with practice_areas object)
-router.put('/profile', auth, async (req, res) => {
-  try {
-    // Constants for practice area fields
+// Constants for practice area fields (move to the top of your file if needed)
 const ALL_PRACTICE_AREAS = [
   "Criminal",
   "Civil",
@@ -281,6 +279,7 @@ router.put('/profile', auth, async (req, res) => {
 });
 
 
+
 // DELETE PROFILE
 router.delete('/profile', auth, async (req, res) => {
   try {
@@ -337,5 +336,6 @@ router.post('/save/:newsId', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 module.exports = router;
