@@ -5,9 +5,20 @@ const API_URL = import.meta.env.VITE_API_URL;
 export default function UploadNews() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [image, setImage] = useState("");
+  const [image, setImage] = useState(null); // Now a File, not string!
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState("");
+
+  // File input handler
+  const handleFileChange = (e) => {
+    setImage(e.target.files[0]);
+    if (e.target.files[0]) {
+      setPreview(URL.createObjectURL(e.target.files[0]));
+    } else {
+      setPreview("");
+    }
+  };
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -16,16 +27,27 @@ export default function UploadNews() {
 
     try {
       const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("content", content);
+      if (image) formData.append("image", image);
+
       await axios.post(
         `${API_URL}/api/news/upload`,
-        { title, content, image },
-        { headers: { Authorization: `Bearer ${token}` } }
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
       setMsg("News uploaded successfully!");
       setTitle("");
       setContent("");
-      setImage("");
-    } catch {
+      setImage(null);
+      setPreview("");
+    } catch (err) {
       setMsg("Failed to upload news.");
     }
     setLoading(false);
@@ -90,20 +112,30 @@ export default function UploadNews() {
             resize: "vertical",
           }}
         />
+        {/* Updated: File input */}
         <input
-          placeholder="Image URL (optional)"
-          value={image}
-          onChange={(e) => setImage(e.target.value)}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
           style={{
-            marginBottom: 24,
-            padding: 12,
-            borderRadius: 6,
-            border: "none",
-            fontSize: 16,
-            background: "#242943",
+            marginBottom: 16,
             color: "#fff",
           }}
         />
+        {preview && (
+          <img
+            src={preview}
+            alt="Preview"
+            style={{
+              width: "100%",
+              maxHeight: 180,
+              objectFit: "cover",
+              borderRadius: 12,
+              marginBottom: 18,
+              border: "1px solid #23243a",
+            }}
+          />
+        )}
         <button
           type="submit"
           disabled={loading}
