@@ -226,20 +226,19 @@ const ALL_PRACTICE_AREAS = [
 router.put('/profile', auth, async (req, res) => {
   try {
     const {
-      full_name,           // Change: now accepts snake_case from frontend
+      full_name,
       mobile_number,
       email,
       bar_council_id,
       qualification,
       experience,
-      practiceArea,        // Array (optional)
-      practice_areas       // Object (optional)
+      practiceArea,
+      practice_areas
     } = req.body;
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: "User not found", status: false });
 
-    // Accept both camelCase and snake_case for backward compatibility
     if (full_name || req.body.fullName) user.fullName = full_name || req.body.fullName;
     if (mobile_number || req.body.mobileNumber) user.mobileNumber = mobile_number || req.body.mobileNumber;
     if (email) user.email = email;
@@ -253,7 +252,6 @@ router.put('/profile', auth, async (req, res) => {
       practiceAreaArray = practiceArea;
     } else if (practice_areas && typeof practice_areas === 'object') {
       practiceAreaArray = [];
-      // Use keys for robustness
       Object.keys(practice_areas).forEach(area => {
         if (practice_areas[area]) practiceAreaArray.push(area);
       });
@@ -262,39 +260,36 @@ router.put('/profile', auth, async (req, res) => {
 
     await user.save();
 
-    // Prepare unified updated data for response
-    const updatedData = {
-      full_name: user.fullName || "NIL",
-      mobile_number: user.mobileNumber || "NIL",
-      email: user.email || "NIL",
-      bar_council_id: user.barCouncilId || "NIL",
-      qualification: user.qualification || "NIL",
-      experience: user.experience || "NIL",
-      practiceArea: user.practiceArea,
-      
-    };
-
-    // Fill practice_areas with booleans for all present areas in DB/user
-    // Use union of frontend and ALL_PRACTICE_AREAS for flexibility
+    // Prepare response data
     const areaList = Array.from(new Set([
       ...Object.keys(practice_areas || {}),
       ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
       "Criminal","Civil","Family","Property","Corporate","Income Tax","IncomeTax"
     ]));
 
+    const resultPracticeAreas = {};
     areaList.forEach(area => {
-      updatedData.practice_areas[area] = user.practiceArea.includes(area);
+      resultPracticeAreas[area] = user.practiceArea.includes(area);
     });
 
     res.json({
       message: "Profile updated successfully",
       status: true,
-      data: updatedData
+      data: {
+        full_name: user.fullName || "NIL",
+        mobile_number: user.mobileNumber || "NIL",
+        email: user.email || "NIL",
+        bar_council_id: user.barCouncilId || "NIL",
+        qualification: user.qualification || "NIL",
+        experience: user.experience || "NIL",
+        practice_areas: resultPracticeAreas
+      }
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to update profile", status: false, error: err.message });
   }
 });
+
 
 
 
