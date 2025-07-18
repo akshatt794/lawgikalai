@@ -32,18 +32,33 @@ router.post('/add', verifyToken, async (req, res) => {
   }
 });
 
-// ✅ Get case list for logged-in user
+// ✅ Get case list for logged-in user with status filter
 router.get('/list', verifyToken, async (req, res) => {
   try {
-    const cases = await Case.find({ userId: req.user.userId }).select(
+    const { status } = req.query;
+
+    // Build filter: always filter by user
+    const filter = { userId: req.user.userId };
+
+    // Apply status filter if needed
+    if (status && status !== 'All') {
+      filter.case_status = status; // Expected: "Ongoing" or "Closed"
+    }
+
+    const cases = await Case.find(filter).select(
       'case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status'
     );
 
-    res.json({ message: "Cases fetched successfully", data: cases });
+    res.json({
+      message: 'Cases fetched successfully',
+      count: cases.length,
+      data: cases,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // ✅ Edit a case by ID (if user owns it)
 router.put('/:caseId', verifyToken, async (req, res) => {
@@ -82,5 +97,7 @@ router.get('/:caseId', verifyToken, async (req, res) => {
     res.status(500).json({ error: "Server error", details: err.message });
   }
 });
+
+
 
 module.exports = router;
