@@ -305,5 +305,39 @@ router.post('/logout', auth, async (req, res) => {
     res.status(500).json({ error: 'Logout failed', details: err.message });
   }
 });
+// LOGIN WITH PHONE NUMBER
+router.post('/login-phone', async (req, res) => {
+  try {
+    const { mobileNumber, password } = req.body;
+
+    if (!mobileNumber || !password) {
+      return res.status(400).json({ error: 'Mobile number and password are required' });
+    }
+
+    const user = await User.findOne({ mobileNumber });
+    if (!user) return res.status(401).json({ error: 'Invalid mobile number or password' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ error: 'Invalid mobile number or password' });
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your_jwt_secret'
+    );
+
+    res.json({
+      message: "Login successful.",
+      token,
+      user: {
+        id: user._id,
+        name: user.fullName,
+        mobile_number: user.mobileNumber
+      }
+    });
+  } catch (err) {
+    console.error('Login (phone) error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
 
 module.exports = router;
