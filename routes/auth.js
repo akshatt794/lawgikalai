@@ -1,14 +1,16 @@
+require('dotenv').config(); // must be at the top before anything else
+
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const router = express.Router();
 const Case = require('../models/Case');
 const News = require('../models/News');
 
+const router = express.Router();
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+// ✅ Ensure this picks up from .env correctly
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // JWT authentication middleware
 function auth(req, res, next) {
@@ -16,12 +18,14 @@ function auth(req, res, next) {
   if (!header) return res.status(401).json({ error: 'Missing token' });
   const token = header.split(' ')[1];
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    req.user = jwt.verify(token, JWT_SECRET); // Uses correct secret now
     next();
-  } catch {
+  } catch (err) {
+    console.error("JWT verification failed:", err.message);
     return res.status(401).json({ error: 'Invalid token' });
   }
 }
+
 
 // LOGIN
 router.post('/login', async (req, res) => {
