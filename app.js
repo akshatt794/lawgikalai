@@ -11,6 +11,7 @@ const homeRoutes = require('./routes/home');
 const caseRoutes = require('./routes/case');
 const documentRoutes = require('./routes/document');
 const ordersRoutes = require('./routes/orders');
+const announcementRoutes = require('./routes/announcements');
 
 // Serve correct uploads directory (tmp for production on Render)
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
@@ -28,6 +29,7 @@ app.use(cors({
 
 // 2. Parse JSON
 app.use(express.json());
+app.use('/api/announcements', announcementRoutes);
 
 // 3. Serve uploads folder as static (PDF/image access)
 app.use('/uploads', express.static(servePath));

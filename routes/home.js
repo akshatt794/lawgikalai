@@ -1,63 +1,52 @@
 const express = require('express');
 const router = express.Router();
+const Announcement = require('../models/Announcement');
+const Case = require('../models/Case');
+const News = require('../models/News');
+const verifyToken = require('../middleware/verifyToken');
 
-// JWT Middleware (reuse from your auth.js)
-const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-
-function auth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: 'Missing token' });
-  const token = header.split(' ')[1];
+// GET /api/home - Homepage Data API
+router.get('/', verifyToken, async (req, res) => {
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
+    const userId = req.user.userId;
 
-router.get('/', auth, async (req, res) => {
-  // TODO: Replace these with actual database queries if needed
-  res.json({
-    status: "success",
-    message: "Home data fetched successfully",
-    data: {
-      total_cases: 15,
-      upcoming_hearings: 3,
-      closed_cases: 6,
-      news: [
-        {
-          id: "n1",
-          title: "Supreme Court Issues New Guidelines",
-          description: "The Supreme Court has issued a new set of guidelines for...",
-          image_url: "https://example.com/images/news1.jpg",
-          created_at: "2025-07-10T09:00:00Z"
-        },
-        {
-          id: "n2",
-          title: "High Court Dismisses Petition",
-          description: "The Delhi High Court has dismissed a petition regarding...",
-          image_url: "https://example.com/images/news2.jpg",
-          created_at: "2025-07-09T14:30:00Z"
-        }
-      ],
-      announcements: [
-        {
-          id: "a1",
-          title: "Maintenance Scheduled",
-          message: "Our services will be down for maintenance on July 15 from 2 AM to 5 AM.",
-          date: "2025-07-11"
-        },
-        {
-          id: "a2",
-          title: "New Feature Released",
-          message: "We have released a new case tracking feature in the app.",
-          date: "2025-07-08"
-        }
-      ]
-    }
-  });
+    // 1. Get last 10 announcements
+    const announcements = await Announcement.find().sort({ createdAt: -1 }).limit(10);
+
+    // 2. Get nearest upcoming case for the user
+    const nearestCase = await Case.findOne({
+      userId,
+      'hearing_details.next_hearing_date': { $gte: new Date() }
+    })
+      .sort({ 'hearing_details.next_hearing_date': 1 })
+      .select('case_title hearing_details.next_hearing_date hearing_details.time court_name _id');
+
+    // 3. Case stats
+    const total = await Case.countDocuments({ userId });
+    const upcoming = await Case.countDocuments({
+      userId,
+      'hearing_details.next_hearing_date': { $gte: new Date() }
+    });
+    const closed = await Case.countDocuments({ userId, case_status: 'Closed' });
+
+    // 4. Get top 10 news
+    const news = await News.find().sort({ createdAt: -1 }).limit(10).select('title image');
+
+    res.json({
+      message: "Home data fetched",
+      announcements,
+      nearest_case: nearestCase,
+      stats: {
+        total,
+        upcoming,
+        closed
+      },
+      news
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
 });
 
 module.exports = router;
