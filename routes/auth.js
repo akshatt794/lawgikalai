@@ -118,7 +118,6 @@ router.post('/forgot-password', async (req, res) => {
 
 // VERIFY OTP
 require('dotenv').config(); // Ensure this is at the very top
-const jwt = require('jsonwebtoken');
 
 // ...
 
