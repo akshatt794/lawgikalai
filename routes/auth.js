@@ -33,10 +33,10 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
+    // Never expiring token:
     const token = jwt.sign(
       { userId: user._id },
-      JWT_SECRET,
-      { expiresIn: '8h' }
+      JWT_SECRET
     );
 
     res.json({
@@ -53,6 +53,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // SIGNUP
 router.post('/signup', async (req, res) => {
@@ -136,11 +137,10 @@ router.post('/verify-otp', async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
-    // Generate JWT token
+    // Never expiring token:
     const token = jwt.sign(
       { userId: user._id },
-      JWT_SECRET,
-      { expiresIn: '8h' }
+      JWT_SECRET
     );
 
     res.json({
@@ -157,6 +157,7 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // RESEND OTP
 router.post('/resend-otp', async (req, res) => {
@@ -289,10 +290,6 @@ router.put('/profile', auth, async (req, res) => {
     res.status(500).json({ message: "Failed to update profile", status: false, error: err.message });
   }
 });
-
-
-
-
 
 // DELETE PROFILE
 router.delete('/profile', auth, async (req, res) => {
