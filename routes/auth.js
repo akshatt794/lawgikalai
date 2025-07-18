@@ -1,31 +1,14 @@
-require('dotenv').config(); // must be at the top before anything else
+require('dotenv').config();
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const Case = require('../models/Case');
 const News = require('../models/News');
+const verifyToken = require('../middleware/verifyToken');
 
 const router = express.Router();
-
-// ✅ Ensure this picks up from .env correctly
 const JWT_SECRET = process.env.JWT_SECRET;
-
-// JWT authentication middleware
-function auth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: 'Missing token' });
-  const token = header.split(' ')[1];
-  try {
-    req.user = jwt.verify(token, JWT_SECRET); // Uses correct secret now
-    next();
-  } catch (err) {
-    console.error("JWT verification failed:", err.message);
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
-
 
 // LOGIN
 router.post('/login', async (req, res) => {
@@ -37,11 +20,7 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // Never expiring token:
-    const token = jwt.sign(
-      { userId: user._id },
-      JWT_SECRET
-    );
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET);
 
     res.json({
       message: "Login successful.",
@@ -49,7 +28,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.fullName,
-        email: user.identifier // Change to user.email if you add that field
+        email: user.identifier
       }
     });
   } catch (err) {
@@ -57,7 +36,6 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
-
 
 // SIGNUP
 router.post('/signup', async (req, res) => {
@@ -73,14 +51,11 @@ router.post('/signup', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const user = new User({ fullName, identifier, password: hash });
 
-    // Use static OTP for now
     const otp = '123456';
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
-
     await user.save();
 
-    // (Pretend to send OTP by email here, or just log it for now)
     console.log(`OTP for ${identifier}: ${otp}`);
 
     res.json({
@@ -101,13 +76,11 @@ router.post('/forgot-password', async (req, res) => {
     const user = await User.findOne({ identifier });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Use static OTP for now
     const otp = '123456';
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    // (Pretend to send OTP via email)
     console.log(`OTP for ${identifier}: ${otp}`);
 
     res.json({
@@ -121,10 +94,6 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // VERIFY OTP
-require('dotenv').config(); // Ensure this is at the very top
-
-// ...
-
 router.post('/verify-otp', async (req, res) => {
   try {
     const { user_id, otp } = req.body;
@@ -134,18 +103,13 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const user = await User.findById(user_id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
 
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET
-    );
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET);
 
     res.json({
       message: "OTP verified successfully.",
@@ -162,7 +126,6 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-
 // RESEND OTP
 router.post('/resend-otp', async (req, res) => {
   try {
@@ -170,14 +133,12 @@ router.post('/resend-otp', async (req, res) => {
     const user = await User.findById(user_id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const otp = '123456'; // static OTP for now
+    const otp = '123456';
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    // (Pretend to send OTP via email)
     console.log(`OTP for ${user.identifier}: ${otp}`);
-
     res.json({ message: 'OTP resent to email.' });
   } catch (err) {
     console.error('Resend OTP error:', err);
@@ -185,13 +146,12 @@ router.post('/resend-otp', async (req, res) => {
   }
 });
 
-// GET PROFILE (returns all requested fields)
-router.get('/profile', auth, async (req, res) => {
+// GET PROFILE
+router.get('/profile', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Default string fields to 'NIL' if empty or not present
     const result = {
       full_name: user.fullName || "NIL",
       mobile_number: user.mobileNumber || "NIL",
@@ -199,46 +159,26 @@ router.get('/profile', auth, async (req, res) => {
       bar_council_id: user.barCouncilId || "NIL",
       qualification: user.qualification || "NIL",
       experience: user.experience || "NIL",
+      practice_areas: {}
     };
 
-    // Practice Areas as booleans, false if not present or not true
     const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax"];
-    result.practice_areas = {};
     possibleAreas.forEach(area => {
-      // If not set, default to false
-      result.practice_areas[area] = user.practiceArea && user.practiceArea.includes(area) ? true : false;
+      result.practice_areas[area] = user.practiceArea?.includes(area) || false;
     });
 
     res.json(result);
-
   } catch (err) {
     res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
-
-// UPDATE PROFILE (accepts the new format with practice_areas object)
-// Constants for practice area fields (move to the top of your file if needed)
-const ALL_PRACTICE_AREAS = [
-  "Criminal",
-  "Civil",
-  "Family",
-  "Property",
-  "Corporate",
-  "Income Tax",
-];
-
-router.put('/profile', auth, async (req, res) => {
+// UPDATE PROFILE
+router.put('/profile', verifyToken, async (req, res) => {
   try {
     const {
-      full_name,
-      mobile_number,
-      email,
-      bar_council_id,
-      qualification,
-      experience,
-      practiceArea,
-      practice_areas
+      full_name, mobile_number, email, bar_council_id,
+      qualification, experience, practiceArea, practice_areas
     } = req.body;
 
     const user = await User.findById(req.user.userId);
@@ -251,7 +191,6 @@ router.put('/profile', auth, async (req, res) => {
     if (qualification) user.qualification = qualification;
     if (experience) user.experience = experience;
 
-    // Accept either format for practice area:
     let practiceAreaArray = user.practiceArea || [];
     if (Array.isArray(practiceArea)) {
       practiceAreaArray = practiceArea;
@@ -265,11 +204,10 @@ router.put('/profile', auth, async (req, res) => {
 
     await user.save();
 
-    // Prepare response data
     const areaList = Array.from(new Set([
       ...Object.keys(practice_areas || {}),
       ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
-      "Criminal","Civil","Family","Property","Corporate","IncomeTax",
+      "Criminal","Civil","Family","Property","Corporate","IncomeTax"
     ]));
 
     const resultPracticeAreas = {};
@@ -296,7 +234,7 @@ router.put('/profile', auth, async (req, res) => {
 });
 
 // DELETE PROFILE
-router.delete('/profile', auth, async (req, res) => {
+router.delete('/profile', verifyToken, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.user.userId);
     res.json({ message: 'Profile deleted' });
@@ -306,11 +244,10 @@ router.delete('/profile', auth, async (req, res) => {
   }
 });
 
-// GET ALL USERS (Protected, use only for admin panel)
-router.get('/all-users', auth, async (req, res) => {
+// GET ALL USERS
+router.get('/all-users', verifyToken, async (req, res) => {
   try {
-    // Optional: Add admin-only check here in the future
-    const users = await User.find({}, "-password -otp -otpExpires"); // exclude sensitive fields
+    const users = await User.find({}, "-password -otp -otpExpires");
     res.json({ users });
   } catch (err) {
     console.error('All users fetch error:', err);
@@ -318,29 +255,12 @@ router.get('/all-users', auth, async (req, res) => {
   }
 });
 
-// Add Case API
-router.post('/add', /*auth,*/ async (req, res) => {
-  try {
-    const caseData = req.body;
-    const newCase = new Case(caseData);
-    await newCase.save();
-    res.json({
-      message: 'Case added successfully',
-      status: true,
-      case: newCase,
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to add case', status: false, error: err.message });
-  }
-});
-
 // Save News (Bookmark)
-router.post('/save/:newsId', auth, async (req, res) => {
+router.post('/save/:newsId', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Prevent duplicate saves
     if (!user.savedNews.includes(req.params.newsId)) {
       user.savedNews.push(req.params.newsId);
       await user.save();
@@ -351,6 +271,5 @@ router.post('/save/:newsId', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
-
 
 module.exports = router;

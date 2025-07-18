@@ -1,65 +1,77 @@
 const express = require('express');
 const router = express.Router();
-const Case = require('../models/Case'); // Make sure you have models/Case.js
-const verifyToken = require('../middleware/verifyToken'); // ✅ Import here
+const Case = require('../models/Case');
+const verifyToken = require('../middleware/verifyToken');
+const jwt = require('jsonwebtoken'); // required for legacy fallback
 
-// Add Case API
-router.post('/add', async (req, res) => {
+// ✅ Utility to generate case_id
+function generateCaseId() {
+  const date = new Date();
+  const yyyymmdd = date.toISOString().split('T')[0].replace(/-/g, '');
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `CASE-${yyyymmdd}-${random}`;
+}
+
+// ✅ Add Case API (Protected)
+router.post('/add', verifyToken, async (req, res) => {
   try {
-    const caseData = req.body;
+    const userId = req.user.userId;
+
+    const caseData = {
+      ...req.body,
+      case_id: generateCaseId(),
+      userId
+    };
+
     const newCase = new Case(caseData);
     await newCase.save();
+
     res.json({ message: 'Case added successfully', case: newCase });
   } catch (err) {
     res.status(500).json({ error: "Something broke!", details: err.message });
   }
 });
-// JWT middleware
-function auth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: 'Missing token' });
-  const token = header.split(' ')[1];
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
 
-// 1. Get case list of user
-router.get('/list', auth, async (req, res) => {
+// ✅ Get case list for logged-in user
+router.get('/list', verifyToken, async (req, res) => {
   try {
-    // If you store userId in Case model, filter by req.user.userId
-    // Otherwise, return all cases
-    const cases = await Case.find({ user: req.user.userId }); // adjust filter as per your model
-    res.json({ cases });
+    const cases = await Case.find({ userId: req.user.userId }).select(
+      'case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status'
+    );
+
+    res.json({ message: "Cases fetched successfully", data: cases });
   } catch (err) {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
-// 2. Edit a case by ID (must belong to user)
-router.put('/:caseId', auth, async (req, res) => {
+// ✅ Edit a case by ID (if user owns it)
+router.put('/:caseId', verifyToken, async (req, res) => {
   try {
     const { caseId } = req.params;
+
     const updated = await Case.findOneAndUpdate(
-      { _id: caseId, createdBy: req.user.userId },
+      { case_id: caseId, userId: req.user.userId },
       { $set: req.body },
       { new: true }
     );
+
     if (!updated)
       return res.status(404).json({ error: "Case not found or not allowed" });
+
     res.json({ message: "Case updated", case: updated });
   } catch (err) {
     res.status(500).json({ error: "Failed to update case", details: err.message });
   }
 });
-// GET CASE DETAILS BY ID
-router.get('/:caseId', /*auth,*/ async (req, res) => {
+
+// ✅ Get details of a case by ID (if needed, auth can be re-enabled)
+router.get('/:caseId', verifyToken, async (req, res) => {
   try {
-    const caseId = req.params.caseId;
-    const caseDetails = await Case.findById(caseId);
+    const caseDetails = await Case.findOne({
+      case_id: req.params.caseId,
+      userId: req.user.userId
+    });
 
     if (!caseDetails) {
       return res.status(404).json({ error: "Case not found" });
@@ -70,7 +82,5 @@ router.get('/:caseId', /*auth,*/ async (req, res) => {
     res.status(500).json({ error: "Server error", details: err.message });
   }
 });
-
-// (You can add more case routes here...)
 
 module.exports = router;

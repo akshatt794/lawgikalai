@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const caseSchema = new mongoose.Schema({
+  case_id: {
+    type: String,
+    unique: true
+  },
   case_title: String,
   case_number: String,
   court_name: String,
@@ -31,6 +35,11 @@ const caseSchema = new mongoose.Schema({
     time: String,
     courtroom_number: String,
     note: String
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   }
 }, { timestamps: true });
 
