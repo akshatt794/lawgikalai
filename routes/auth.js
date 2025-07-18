@@ -117,30 +117,31 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // VERIFY OTP
+require('dotenv').config(); // Ensure this is at the very top
+const jwt = require('jsonwebtoken');
+
+// ...
+
 router.post('/verify-otp', async (req, res) => {
   try {
     const { user_id, otp } = req.body;
 
-    // Only accept '123456' as a valid OTP
     if (otp !== '123456') {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
-    // Find user by user_id
     const user = await User.findById(user_id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // (Optionally clear any otp fields, if you want)
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
 
-    // Never expiring token:
     const token = jwt.sign(
       { userId: user._id },
-      JWT_SECRET
+      process.env.JWT_SECRET
     );
 
     res.json({
@@ -149,7 +150,7 @@ router.post('/verify-otp', async (req, res) => {
       user: {
         id: user._id,
         name: user.fullName,
-        email: user.identifier // (or user.email if you add that field)
+        email: user.identifier
       }
     });
   } catch (err) {
