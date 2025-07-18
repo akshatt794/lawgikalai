@@ -271,7 +271,7 @@ router.put('/profile', auth, async (req, res) => {
       qualification: user.qualification || "NIL",
       experience: user.experience || "NIL",
       practiceArea: user.practiceArea,
-      practice_areas: {}
+      
     };
 
     // Fill practice_areas with booleans for all present areas in DB/user
