@@ -225,7 +225,7 @@ const ALL_PRACTICE_AREAS = [
   "Family",
   "Property",
   "Corporate",
-  "Income Tax"
+  "Income Tax",
 ];
 
 router.put('/profile', auth, async (req, res) => {
@@ -269,7 +269,7 @@ router.put('/profile', auth, async (req, res) => {
     const areaList = Array.from(new Set([
       ...Object.keys(practice_areas || {}),
       ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
-      "Criminal","Civil","Family","Property","Corporate","Income Tax","IncomeTax"
+      "Criminal","Civil","Family","Property","Corporate","Income Tax",
     ]));
 
     const resultPracticeAreas = {};
