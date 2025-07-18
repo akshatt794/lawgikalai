@@ -29,5 +29,23 @@ router.get('/count', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
-
+// Add announcement (Admin)
+router.post('/add', auth, async (req, res) => {
+    try {
+      const { title, content } = req.body;
+  
+      if (!title || !content) {
+        return res.status(400).json({ error: 'Title and content are required' });
+      }
+  
+      const newAnnouncement = new Announcement({ title, content });
+      await newAnnouncement.save();
+  
+      res.json({ message: 'Announcement added successfully', announcement: newAnnouncement });
+    } catch (err) {
+      console.error('Error adding announcement:', err.message);
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+});
+  
 module.exports = router;
