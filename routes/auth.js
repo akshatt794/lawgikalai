@@ -269,7 +269,7 @@ router.put('/profile', auth, async (req, res) => {
     const areaList = Array.from(new Set([
       ...Object.keys(practice_areas || {}),
       ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
-      "Criminal","Civil","Family","Property","Corporate","Income Tax",
+      "Criminal","Civil","Family","Property","Corporate","IncomeTax",
     ]));
 
     const resultPracticeAreas = {};
