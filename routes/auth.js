@@ -176,7 +176,7 @@ router.get('/profile', verifyToken, async (req, res) => {
       practice_areas: {}
     };
 
-    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration"];
+    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration","Others"];
     possibleAreas.forEach(area => {
       result.practice_areas[area] = user.practiceArea?.includes(area) || false;
     });
@@ -221,7 +221,7 @@ router.put('/profile', verifyToken, async (req, res) => {
     const areaList = Array.from(new Set([
       ...Object.keys(practice_areas || {}),
       ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
-      "Criminal","Civil","Family","Property","Corporate","IncomeTax","Arbitration"
+      "Criminal","Civil","Family","Property","Corporate","IncomeTax","Arbitration","Others"
     ]));
 
     const resultPracticeAreas = {};

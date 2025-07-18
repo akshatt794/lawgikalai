@@ -75,18 +75,24 @@ router.put('/:caseId', verifyToken, async (req, res) => {
 });
 
 // ✅ Get details of a case by ID (if needed, auth can be re-enabled)
-router.get('/:caseId', verifyToken, async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
-    const caseDetails = await Case.findOne({
-      case_id: req.params.caseId,
-      userId: req.user.userId
-    });
+    const caseId = req.query.caseId;
+
+    if (!caseId) {
+      return res.status(400).json({ error: "Missing caseId parameter" });
+    }
+
+    const caseDetails = await Case.findById(caseId);
 
     if (!caseDetails) {
       return res.status(404).json({ error: "Case not found" });
     }
 
-    res.json(caseDetails);
+    res.json({
+      message: "Case details fetched successfully",
+      data: caseDetails,
+    });
   } catch (err) {
     res.status(500).json({ error: "Server error", details: err.message });
   }
