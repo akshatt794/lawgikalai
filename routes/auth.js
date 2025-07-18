@@ -331,7 +331,8 @@ router.post('/login-phone', async (req, res) => {
       user: {
         id: user._id,
         name: user.fullName,
-        mobile_number: user.mobileNumber
+        email: user.email,  // ✅ added email here
+        mobile_number: user.mobileNumber       
       }
     });
   } catch (err) {
