@@ -162,7 +162,7 @@ router.get('/profile', verifyToken, async (req, res) => {
       practice_areas: {}
     };
 
-    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax"];
+    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration"];
     possibleAreas.forEach(area => {
       result.practice_areas[area] = user.practiceArea?.includes(area) || false;
     });
