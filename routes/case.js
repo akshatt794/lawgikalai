@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Case = require('../models/Case'); // Make sure you have models/Case.js
+const verifyToken = require('../middleware/verifyToken'); // ✅ Import here
 
 // Add Case API
 router.post('/add', async (req, res) => {
