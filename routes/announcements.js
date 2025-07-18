@@ -3,6 +3,23 @@ const router = express.Router();
 const Announcement = require('../models/Announcement');
 
 // 🔐 Optional auth middleware (uncomment if needed)
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+
+// JWT auth middleware
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: 'Missing token' });
+
+  const token = header.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
 // const auth = require('../middleware/auth');
 
 // GET all announcements with optional search
