@@ -35,29 +35,23 @@ router.post('/add', verifyToken, async (req, res) => {
 // ✅ Get case list for logged-in user with status filter
 router.get('/list', verifyToken, async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status } = req.query; // all / ongoing / closed
+    const query = { userId: req.user.userId };
 
-    // Build filter: always filter by user
-    const filter = { userId: req.user.userId };
+    if (status === 'ongoing') query.case_status = 'Ongoing';
+    else if (status === 'closed') query.case_status = 'Closed';
+    // if status = 'all' or undefined, we don't filter case_status
 
-    // Apply status filter if needed
-    if (status && status !== 'All') {
-      filter.case_status = status; // Expected: "Ongoing" or "Closed"
-    }
-
-    const cases = await Case.find(filter).select(
+    const cases = await Case.find(query).select(
       'case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status'
     );
 
-    res.json({
-      message: 'Cases fetched successfully',
-      count: cases.length,
-      data: cases,
-    });
+    res.json({ message: "Cases fetched successfully", count: cases.length, data: cases });
   } catch (err) {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 
 // ✅ Edit a case by ID (if user owns it)
