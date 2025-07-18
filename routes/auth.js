@@ -271,5 +271,16 @@ router.post('/save/:newsId', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+// DELETE ACCOUNT
+router.delete('/delete-account', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    await User.findByIdAndDelete(userId);
+    res.json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    res.status(500).json({ error: 'Failed to delete account', details: err.message });
+  }
+});
 
 module.exports = router;
