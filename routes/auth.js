@@ -296,5 +296,14 @@ router.delete('/delete-account', auth, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete account', details: err.message });
   }
 });
+//logout
+router.post('/logout', auth, async (req, res) => {
+  try {
+    // No server-side token invalidation — just inform client
+    res.json({ message: 'Logout successful. Please clear your token on client side.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Logout failed', details: err.message });
+  }
+});
 
 module.exports = router;
