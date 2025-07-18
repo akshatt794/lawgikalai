@@ -107,5 +107,46 @@ router.get('/saved', auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ✅ Public list of all news (alias for /all)
+router.get('/list', async (req, res) => {
+  try {
+    const news = await News.find().sort({ createdAt: -1 });
+    res.json({ message: "News list fetched", data: news });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch news", details: err.message });
+  }
+});
+// ✅ Get details of one news item
+router.get('/:newsId', async (req, res) => {
+  try {
+    const newsItem = await News.findById(req.params.newsId);
+    if (!newsItem) {
+      return res.status(404).json({ error: "News not found" });
+    }
+    res.json(newsItem);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch news item", details: err.message });
+  }
+});
+// ✅ Add news (without image) — protected
+router.post('/add', auth, async (req, res) => {
+  try {
+    const { title, content, image, publishedAt, source } = req.body;
+
+    const news = new News({
+      title,
+      content,
+      image,
+      publishedAt,
+      source
+    });
+
+    await news.save();
+    res.status(201).json({ message: "News added", news });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to add news", details: err.message });
+  }
+});
+
 
 module.exports = router;
