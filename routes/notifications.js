@@ -1,5 +1,10 @@
 const express = require('express');
 const router = express.Router();
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 router.post('/register-token', async (req, res) => {
   const { userId, token } = req.body;
