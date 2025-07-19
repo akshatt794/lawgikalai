@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const courtData = require('../data/courtData'); // Adjust the path if needed
+const courtData = require('../data/courtData');
 
 router.get('/courts', (req, res) => {
   const { type } = req.query;
@@ -9,7 +9,10 @@ router.get('/courts', (req, res) => {
     return res.status(400).json({ error: 'Invalid or missing court type' });
   }
 
-  return res.json(courtData[type.toLowerCase()]);
+  return res.status(200).json({
+    message: "Fetched data successfully",
+    data: courtData[type.toLowerCase()]
+  });
 });
 
 module.exports = router;
