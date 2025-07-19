@@ -32,10 +32,11 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Upload Error:', err); // <-- shows exact reason in logs
+    console.error("❌ ERROR during upload:", err); // ← REAL error output
     res.status(500).json({ error: err.message || 'Something broke!' });
   }
 });
+
 
 
 
