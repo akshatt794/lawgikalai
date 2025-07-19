@@ -2,11 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const exploreRoutes = require('./routes/exploreCourt');
 
 // Route imports
 const authRoutes = require('./routes/auth');
 const newsRoutes = require('./routes/news');
-const exploreRoutes = require('./routes/explore');
+const exploreCourtRoutes = require('./routes/exploreCourt');
 const homeRoutes = require('./routes/home');
 const caseRoutes = require('./routes/case');
 const documentRoutes = require('./routes/document');
@@ -17,6 +18,7 @@ const announcementRoutes = require('./routes/announcements');
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
 const app = express();
+app.use('/api/home', homeRoutes);
 
 // 1. CORS (VERY TOP)
 app.use(cors({
@@ -26,6 +28,7 @@ app.use(cors({
   ],
   credentials: true
 }));
+app.use('/api/explore', exploreCourtRoutes);
 
 // 2. Parse JSON
 app.use(express.json());
