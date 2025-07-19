@@ -1,5 +1,3 @@
-// courtData.js
-
 const courtData = {
     supremecourt: [
       {
@@ -39,6 +37,37 @@ const courtData = {
         name: "District Court Services Portal",
         link: "https://districts.ecourts.gov.in/"
       }
+    ],
+    policeadministration: [
+      { name: "Andhra Pradesh Police", link: "https://citizen.appolice.gov.in/" },
+      { name: "Arunachal Pradesh Police", link: "https://arunpol.nic.in/" },
+      { name: "Assam Police", link: "https://police.assam.gov.in/" },
+      { name: "Bihar Police", link: "https://biharpolice.bih.nic.in/" },
+      { name: "Chhattisgarh Police", link: "https://cgpolice.gov.in/" },
+      { name: "Delhi Police", link: "https://delhipolice.gov.in/" },
+      { name: "Goa Police", link: "https://citizen.goapolice.gov.in/" },
+      { name: "Gujarat Police", link: "https://police.gujarat.gov.in/" },
+      { name: "Haryana Police", link: "https://haryanapolice.gov.in/" },
+      { name: "Himachal Pradesh Police", link: "https://citizenportal.hppolice.gov.in/" },
+      { name: "Jharkhand Police", link: "https://jhpolice.gov.in/" },
+      { name: "Karnataka Police", link: "https://ksp.karnataka.gov.in/" },
+      { name: "Kerala Police", link: "https://keralapolice.gov.in/" },
+      { name: "Madhya Pradesh Police", link: "https://mppolice.gov.in/" },
+      { name: "Maharashtra Police", link: "https://mahapolice.gov.in/" },
+      { name: "Manipur Police", link: "https://manipurpolice.gov.in/" },
+      { name: "Meghalaya Police", link: "https://megpolice.gov.in/" },
+      { name: "Mizoram Police", link: "https://police.mizoram.gov.in/" },
+      { name: "Nagaland Police", link: "https://nagapol.gov.in/" },
+      { name: "Odisha Police", link: "https://odishapolice.gov.in/" },
+      { name: "Punjab Police", link: "https://punjabpolice.gov.in/" },
+      { name: "Rajasthan Police", link: "https://police.rajasthan.gov.in/" },
+      { name: "Sikkim Police", link: "https://sikkimpolice.nic.in/" },
+      { name: "Tamil Nadu Police", link: "https://eservices.tnpolice.gov.in/" },
+      { name: "Telangana Police", link: "https://www.tspolice.gov.in/" },
+      { name: "Tripura Police", link: "https://tripurapolice.gov.in/" },
+      { name: "Uttar Pradesh Police", link: "https://uppolice.gov.in/" },
+      { name: "Uttarakhand Police", link: "https://uttarakhandpolice.uk.gov.in/" },
+      { name: "West Bengal Police", link: "https://wbpolice.gov.in/" }
     ]
   };
   
