@@ -23,12 +23,14 @@ router.post('/upload', upload.single('order'), (req, res) => {
     return res.status(400).json({ error: 'No PDF uploaded' });
   }
 
+  // ✅ Cloudinary provides hosted URL in `req.file.path`
   res.json({
     title: req.body.title || "",
     file_name: req.file.originalname,
-    file_url: req.file.path, // ✅ Cloudinary URL
+    file_url: req.file.path, // ✅ use this for access
     message: "Order uploaded successfully!"
   });
 });
+
 
 module.exports = router;
