@@ -45,6 +45,7 @@ app.use('/api/home', homeRoutes);
 app.use('/api/case', caseRoutes);
 app.use('/api', documentRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/uploads', express.static('uploads'));
 
 // 5. Base route
 app.get("/", (req, res) => {
