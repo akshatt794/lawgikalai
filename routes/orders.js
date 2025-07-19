@@ -18,19 +18,25 @@ const upload = multer({ storage });
 
 // @route   POST /api/orders/upload
 // @desc    Upload PDF and return URL
-router.post('/upload', upload.single('order'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No PDF uploaded' });
-  }
+router.post('/upload', upload.single('order'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF uploaded' });
+    }
 
-  // ✅ Cloudinary provides hosted URL in `req.file.path`
-  res.json({
-    title: req.body.title || "",
-    file_name: req.file.originalname,
-    file_url: req.file.path, // ✅ use this for access
-    message: "Order uploaded successfully!"
-  });
+    res.json({
+      title: req.body.title || "",
+      file_name: req.file.originalname,
+      file_url: req.file.path,
+      message: "Order uploaded successfully!"
+    });
+
+  } catch (err) {
+    console.error('❌ Upload Error:', err); // <-- shows exact reason in logs
+    res.status(500).json({ error: err.message || 'Something broke!' });
+  }
 });
+
 
 
 module.exports = router;
