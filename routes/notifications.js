@@ -1,5 +1,7 @@
+const admin = require("firebase-admin");
 const express = require('express');
 const router = express.Router();
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -22,11 +24,11 @@ router.post('/register-token', async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-router.post('/send', async (req, res) => {
+router.post("/send", async (req, res) => {
   const { token, title, body } = req.body;
 
   if (!token || !title || !body) {
-    return res.status(400).json({ error: 'token, title, and body are required' });
+    return res.status(400).json({ error: "token, title, and body are required" });
   }
 
   const message = {
@@ -34,7 +36,7 @@ router.post('/send', async (req, res) => {
       title,
       body,
     },
-    token: token,
+    token,
   };
 
   try {
@@ -45,6 +47,9 @@ router.post('/send', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+module.exports = router;
+
 
 module.exports = router;
 
