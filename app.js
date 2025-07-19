@@ -50,6 +50,7 @@ app.use('/api/orders', ordersRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/notification', notificationRoutes);
+app.use('/api/ai', require('./routes/aiDrafting'));
 
 // 5. Base route
 app.get("/", (req, res) => {
