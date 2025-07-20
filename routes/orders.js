@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('../utils/cloudinary');
+const Order = require('../models/Order'); // adjust the path if different
 
 // Cloudinary storage for PDFs
 const storage = new CloudinaryStorage({
