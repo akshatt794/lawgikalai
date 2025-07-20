@@ -1,11 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UploadNews from "./pages/UploadNews";
 import AllNews from "./pages/AllNews";
 import Users from "./pages/Users";
 import ExplorePage from "./pages/ExplorePage";
-import UploadOrders from "./pages/UploadOrders"; // Adjust path as needed
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import UploadOrders from "./pages/UploadOrders";
+
+// Inside your <Routes> block:
+
 
 // No require('cors') or app.use() here!
 
@@ -36,7 +40,7 @@ function Navbar() {
       <Link to="/users" style={navLinkStyle}>Users</Link>
       <Link to="/explore" style={navLinkStyle}>Explore</Link>
       <Link to="/orders-upload">Upload Orders</Link>
-
+      <Link to="/admin/upload-orders">Upload Orders</Link>
     </nav>
   );
 }
@@ -55,8 +59,7 @@ function AppWithNavbar() {
         <Route path="/all-news" element={<AllNews />} />
         <Route path="/users" element={<Users />} />
         <Route path="/explore" element={<ExplorePage />} />
-        <Route path="/orders-upload" element={<UploadOrders />} />
-      </Routes>
+        <Route path="/admin/upload-orders" element={<UploadOrders />} />      </Routes>
     </>
   );
 }

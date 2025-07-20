@@ -1,4 +1,5 @@
 require('dotenv').config();
+require("dotenv").config({ path: ".env.firebase" });
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -14,7 +15,6 @@ const documentRoutes = require('./routes/document');
 const ordersRoutes = require('./routes/orders');
 const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
-const notificationRoutes = require('./routes/notifications');
 
 // Serve correct uploads directory (tmp for production on Render)
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
@@ -49,7 +49,6 @@ app.use('/api', documentRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/subscription', subscriptionRoutes);
-app.use('/api/notifications', notificationRoutes);
 app.use('/api/ai', require('./routes/aiDrafting'));
 
 // 5. Base route
