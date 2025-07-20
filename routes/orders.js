@@ -43,5 +43,25 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: err.message || 'Something broke!' });
   }
 });
+// @route   GET /api/orders
+// @desc    Get all orders or search by title starting with a letter
+router.get('/', async (req, res) => {
+  try {
+    const { search } = req.query;
 
+    const query = search
+      ? { title: { $regex: `^${search}`, $options: 'i' } }
+      : {};
+
+    const orders = await Order.find(query).sort({ uploadedAt: -1 });
+
+    res.json({
+      message: '📦 Orders fetched successfully',
+      count: orders.length,
+      orders
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Server Error' });
+  }
+});
 module.exports = router;
