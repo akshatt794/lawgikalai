@@ -3,8 +3,11 @@ const admin = require('firebase-admin');
 const path = require('path');
 const router = express.Router();
 
+const serviceAccount = require(path.join(__dirname, "firebaseServiceKey.json"));
+
 // ✅ Import the local service account key
-const serviceAccount = require(path.join(__dirname, '../firebaseServiceKey.json'));
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+
 
 // ✅ Initialize Firebase Admin SDK
 if (!admin.apps.length) {
