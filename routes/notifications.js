@@ -1,10 +1,12 @@
 const express = require('express');
-const admin = require("firebase-admin");
+const admin = require('firebase-admin');
+const path = require('path');
 const router = express.Router();
 
-// ✅ Use environment-based secret loading (secure & Render-friendly)
-const serviceAccount = require("../firebaseServiceKey.json"); // Adjust path as needed
+// ✅ Import the local service account key
+const serviceAccount = require(path.join(__dirname, '../firebaseServiceKey.json'));
 
+// ✅ Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -20,7 +22,7 @@ router.post('/register-token', async (req, res) => {
   }
 
   try {
-    // Save token logic (e.g., DB save) — placeholder
+    // TODO: Save token to DB here
     console.log(`Token saved: ${token} for user ${userId}`);
     res.status(200).json({ message: "Token registered successfully" });
   } catch (err) {
