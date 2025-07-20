@@ -16,6 +16,10 @@ const storage = new CloudinaryStorage({
 });
 
 const upload = multer({ storage });
+router.get('/all', async (req, res) => {
+  const all = await Order.find();
+  res.json(all);
+});
 
 // @route   POST /api/orders/upload
 // @desc    Upload PDF and return URL
