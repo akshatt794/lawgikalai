@@ -6,7 +6,10 @@ const SubscriptionPlan = require('../models/SubscriptionPlan');
 router.get('/', async (req, res) => {
   try {
     const plans = await SubscriptionPlan.find({ isActive: true }).sort({ price: 1 });
-    res.json(plans);
+    res.json({
+      message: "Plan fetched successfully",
+      plans: plans
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
