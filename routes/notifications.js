@@ -3,10 +3,7 @@ const admin = require("firebase-admin");
 const router = express.Router();
 
 // ✅ Use environment-based secret loading (secure & Render-friendly)
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_CONFIG.replace(/\\n/g, '\n')
-);
-
+const serviceAccount = require("../firebaseServiceKey.json"); // Adjust path as needed
 
 if (!admin.apps.length) {
   admin.initializeApp({
