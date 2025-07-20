@@ -37,7 +37,24 @@ router.post('/upload', upload.single('order'), async (req, res) => {
   }
 });
 
+router.get('/', async (req, res) => {
+  try {
+    const { search } = req.query;
 
+    let query = {};
+    if (search) {
+      const regex = new RegExp('^' + search, 'i'); // case-insensitive, starts with
+      query.file_name = { $regex: regex };
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+
+    res.json(orders);
+  } catch (err) {
+    console.error("❌ Failed to fetch orders:", err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
 
 
 module.exports = router;
