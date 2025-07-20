@@ -3,9 +3,9 @@ const router = express.Router();
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('../utils/cloudinary');
-const Order = require('../models/Order'); // ✅ Make sure you have this model
+const Order = require('../models/Order'); // ✅ import model
 
-// Cloudinary storage for PDFs
+// Storage setup
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -17,51 +17,53 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-// @route   POST /api/orders/upload
-// @desc    Upload PDF, save to DB and return URL
+// ✅ POST /api/orders/upload — upload + save
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No PDF uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No PDF uploaded' });
 
     const newOrder = new Order({
-      title: req.body.title || "",
+      title: req.body.title || "Untitled",
       file_name: req.file.originalname,
       file_url: req.file.path
     });
 
-    await newOrder.save(); // ✅ Save to MongoDB
+    await newOrder.save(); // ✅ save to DB
 
     res.json({
-      message: "✅ Order uploaded & saved successfully!",
+      message: 'Order uploaded and saved successfully!',
       order: newOrder
     });
 
   } catch (err) {
-    console.error("❌ Upload Error:", err);
-    res.status(500).json({ error: err.message || 'Something broke!' });
+    console.error("❌ Upload error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
+
 // @route   GET /api/orders
 // @desc    Get all orders or search by title starting with a letter
+// ✅ GET /api/orders — fetch all orders or filter by title
 router.get('/', async (req, res) => {
   try {
-    const { search } = req.query;
+    const { title } = req.query;
 
-    const query = search
-      ? { title: { $regex: `^${search}`, $options: 'i' } }
-      : {};
+    let query = {};
+    if (title) {
+      query.title = { $regex: `^${title}`, $options: 'i' }; // case-insensitive startsWith
+    }
 
-    const orders = await Order.find(query).sort({ uploadedAt: -1 });
+    const orders = await Order.find(query).sort({ createdAt: -1 });
 
     res.json({
-      message: '📦 Orders fetched successfully',
+      message: "📦 Orders fetched successfully",
       count: orders.length,
       orders
     });
+
   } catch (err) {
-    res.status(500).json({ error: err.message || 'Server Error' });
+    res.status(500).json({ error: err.message });
   }
 });
+
 module.exports = router;
