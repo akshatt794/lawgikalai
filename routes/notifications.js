@@ -1,7 +1,9 @@
-const admin = require("firebase-admin");
 const express = require('express');
+const admin = require("firebase-admin");
 const router = express.Router();
-const serviceAccount = require("../firebaseServiceKey.json");
+
+// ✅ Use environment-based secret loading (secure & Render-friendly)
+const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -9,6 +11,7 @@ if (!admin.apps.length) {
   });
 }
 
+// 🔐 Save FCM Token
 router.post('/register-token', async (req, res) => {
   const { userId, token } = req.body;
 
@@ -17,7 +20,7 @@ router.post('/register-token', async (req, res) => {
   }
 
   try {
-    // Save to DB or memory (for now)
+    // Save token logic (e.g., DB save) — placeholder
     console.log(`Token saved: ${token} for user ${userId}`);
     res.status(200).json({ message: "Token registered successfully" });
   } catch (err) {
@@ -25,6 +28,8 @@ router.post('/register-token', async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// 🚀 Send Notification
 router.post("/send", async (req, res) => {
   const { token, title, body } = req.body;
 
@@ -48,10 +53,5 @@ router.post("/send", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-module.exports = router;
-
-
-module.exports = router;
 
 module.exports = router;
