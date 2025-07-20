@@ -56,7 +56,7 @@ router.get('/', async (req, res) => {
     const orders = await Order.find(query).sort({ createdAt: -1 });
 
     res.json({
-      message: "📦 Orders fetched successfully",
+      message: "Orders fetched successfully",
       count: orders.length,
       orders
     });
