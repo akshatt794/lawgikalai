@@ -30,7 +30,11 @@ router.get('/', verifyToken, async (req, res) => {
     const closed = await Case.countDocuments({ userId, case_status: 'Closed' });
 
     // 4. Get top 10 news
-    const news = await News.find().sort({ createdAt: -1 }).limit(10).select('title image');
+    const news = await News.find()
+  .sort({ createdAt: -1 })
+  .limit(10)
+  .select('title content image'); // Include content and image field
+
 
     res.json({
       message: "Home data fetched",
