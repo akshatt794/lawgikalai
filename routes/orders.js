@@ -46,24 +46,34 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 // ✅ GET /api/orders — fetch all orders or filter by title
 router.get('/', async (req, res) => {
   try {
-    const { title } = req.query;
+    const { title, page = 1, limit = 10 } = req.query;
 
-    let query = {};
+    const query = {};
     if (title) {
-      query.title = { $regex: `^${title}`, $options: 'i' }; // case-insensitive startsWith
+      query.title = { $regex: `^${title}`, $options: 'i' }; // Optional search
     }
 
-    const orders = await Order.find(query).sort({ createdAt: -1 });
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Order.countDocuments(query);
 
     res.json({
       message: "Orders fetched successfully",
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
       count: orders.length,
       orders
     });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 module.exports = router;

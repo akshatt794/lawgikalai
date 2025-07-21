@@ -112,14 +112,38 @@ router.get('/saved', auth, async (req, res) => {
   }
 });
 // ✅ Public list of all news (alias for /all)
+// ✅ Paginated News List
 router.get('/list', async (req, res) => {
   try {
-    const news = await News.find().sort({ createdAt: -1 });
-    res.json({ message: "News list fetched", data: news });
+    // Get page and limit from query — fallback to defaults
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const skip = (page - 1) * limit;
+
+    // Fetch paginated news
+    const news = await News.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select('title content image createdAt');
+
+    // Count total docs
+    const total = await News.countDocuments();
+
+    res.json({
+      message: "News list fetched",
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      count: news.length,
+      data: news
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch news", details: err.message });
   }
 });
+
 // ✅ Get details of one news item
 router.get('/:newsId', async (req, res) => {
   try {

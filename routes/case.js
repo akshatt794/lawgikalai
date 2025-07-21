@@ -35,22 +35,35 @@ router.post('/add', verifyToken, async (req, res) => {
 // ✅ Get case list for logged-in user with status filter
 router.get('/list', verifyToken, async (req, res) => {
   try {
-    const { status } = req.query; // all / ongoing / closed
+    const { status, page = 1, limit = 10 } = req.query;
     const query = { userId: req.user.userId };
 
     if (status === 'ongoing') query.case_status = 'Ongoing';
     else if (status === 'closed') query.case_status = 'Closed';
-    // if status = 'all' or undefined, we don't filter case_status
 
-    const cases = await Case.find(query).select(
-      'case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status'
-    );
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    res.json({ message: "Cases fetched successfully", count: cases.length, data: cases });
+    const cases = await Case.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status');
+
+    const total = await Case.countDocuments(query);
+
+    res.json({
+      message: "Cases fetched successfully",
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      count: cases.length,
+      data: cases
+    });
   } catch (err) {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 
 
