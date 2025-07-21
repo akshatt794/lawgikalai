@@ -33,7 +33,7 @@ router.get('/', verifyToken, async (req, res) => {
     const news = await News.find()
   .sort({ createdAt: -1 })
   .limit(10)
-  .select('title content image'); // Include content and image field
+  .select('title content image'); // ✅ image is included herenclude content 
 
 
     res.json({
