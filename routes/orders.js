@@ -25,7 +25,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     const newOrder = new Order({
       title: req.body.title || "Untitled",
       file_name: req.file.originalname,
-      file_url: req.file.path
+      file_url: req.file.secure_url
     });
 
     await newOrder.save(); // ✅ save to DB
