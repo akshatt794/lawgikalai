@@ -16,6 +16,7 @@ const ordersRoutes = require('./routes/orders');
 const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
 const courtRoutes = require('./routes/courts');
+const notificationRoutes = require('./routes/notification');
 
 
 // Serve correct uploads directory (tmp for production on Render)
@@ -53,6 +54,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/ai', require('./routes/aiDrafting'));
 app.use('/api/explore/courts', courtRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 5. Base route
 app.get("/", (req, res) => {
