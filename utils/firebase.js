@@ -1,7 +1,13 @@
-const admin = require('firebase-admin');
+const admin = require("firebase-admin");
 
-const firebaseConfig = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON); // ✅ Parse from env
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  throw new Error("FIREBASE_SERVICE_ACCOUNT is not defined");
+}
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
-  credential: admin.credential.cert(firebaseConfig),
+  credential: admin.credential.cert(serviceAccount),
 });
+
+module.exports = admin;
