@@ -15,6 +15,8 @@ const documentRoutes = require('./routes/document');
 const ordersRoutes = require('./routes/orders');
 const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
+const courtRoutes = require('./routes/courts');
+
 
 // Serve correct uploads directory (tmp for production on Render)
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
@@ -50,6 +52,7 @@ app.use('/api/orders', ordersRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/ai', require('./routes/aiDrafting'));
+app.use('/api/explore/courts', courtRoutes);
 
 // 5. Base route
 app.get("/", (req, res) => {
