@@ -60,7 +60,17 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     });
     await news.save();
 
-    res.json({ message: "News uploaded!", news });
+    res.json({
+      message: "News uploaded!",
+      news: {
+        _id: newOrder._id,
+        title: newOrder.title,
+        content: newOrder.content,
+        image: newOrder.image, // ✅ Add this
+        createdAt: newOrder.createdAt
+      }
+    });
+    
   } catch (err) {
     console.error("Upload error:", err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
