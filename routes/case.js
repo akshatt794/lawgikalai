@@ -97,6 +97,25 @@ router.get('/', verifyToken, async (req, res) => {
     res.status(500).json({ error: "Server error", details: err.message });
   }
 });
+// ✅ Delete a case by case_id (only if user owns it)
+router.delete('/:caseId', verifyToken, async (req, res) => {
+  try {
+    const { caseId } = req.params;
+
+    const deletedCase = await Case.findOneAndDelete({
+      case_id: caseId,
+      userId: req.user.userId
+    });
+
+    if (!deletedCase) {
+      return res.status(404).json({ error: "Case not found or not authorized to delete" });
+    }
+
+    res.json({ message: "Case deleted successfully", case: deletedCase });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete case", details: err.message });
+  }
+});
 
 
 
