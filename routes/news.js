@@ -117,19 +117,21 @@ router.get('/list', async (req, res) => {
   }
 });
 // ✅ Get details of one news item
-router.get('/:newsId?', async (req, res) => {
+router.get('/:newsId', async (req, res) => {
   try {
-    const newsId = req.params.newsId || req.query.newsId;
-    if (!newsId) return res.status(400).json({ error: "Missing newsId" });
+    const newsId = req.params.newsId;
 
     const newsItem = await News.findById(newsId);
-    if (!newsItem) return res.status(404).json({ error: "News not found" });
+    if (!newsItem) {
+      return res.status(404).json({ error: "News not found" });
+    }
 
     res.json(newsItem);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch news item", details: err.message });
   }
 });
+
 
 // ✅ Add news (without image) — protected
 router.post('/add', auth, async (req, res) => {
