@@ -4,6 +4,7 @@ const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('../utils/cloudinary');
 const Order = require('../models/Order'); // ✅ import model
+const { Readable } = require('stream');
 
 // Storage setup
 const storage = new CloudinaryStorage({
