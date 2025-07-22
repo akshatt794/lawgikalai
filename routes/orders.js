@@ -6,7 +6,14 @@ const cloudinary = require('../config/cloudinary');
 const Order = require('../models/Order');
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Only PDFs allowed!'));
+  }
+});
+
 
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
@@ -23,7 +30,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-orders',
-          resource_type: 'raw',
+          resource_type: 'auto',
           public_id: fileName,
           format: 'pdf'
         },
