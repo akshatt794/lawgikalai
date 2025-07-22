@@ -198,6 +198,35 @@ router.delete('/save/:userId/:newsId', async (req, res) => {
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
+// POST /api/news/toggle-save/:newsId
+router.post('/toggle-save/:newsId', auth, async (req, res) => {
+  try {
+    const { newsId } = req.params;
+    const userId = req.user.userId; // 👈 must match your jwt payload
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const alreadySaved = user.savedNews.includes(newsId);
+
+    if (alreadySaved) {
+      user.savedNews = user.savedNews.filter(id => id.toString() !== newsId);
+    } else {
+      user.savedNews.push(newsId);
+    }
+
+    await user.save();
+
+    res.json({
+      message: alreadySaved ? 'News unsaved' : 'News saved',
+      saved: !alreadySaved,
+      savedNews: user.savedNews,
+    });
+  } catch (err) {
+    console.error('❌ Toggle save error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 
 module.exports = router;
