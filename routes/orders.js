@@ -1,42 +1,27 @@
+const { Readable } = require('stream');
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const { Readable } = require('stream');
-const cloudinary = require('../config/cloudinary');
+const upload = require('../middleware/multer');
+const cloudinary = require('../config/cloudinary'); // Make sure this exists
 const Order = require('../models/Order');
-
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
-    else cb(new Error('Only PDFs allowed!'));
-  }
-});
-
 
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No PDF uploaded' });
 
-    const fileName = req.file.originalname.replace('.pdf', '');
-    const bufferStream = new Readable();
-    bufferStream.push(req.file.buffer);
-    bufferStream.push(null); // end the stream
+    const bufferStream = Readable.from(req.file.buffer);
 
     const cloudResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-orders',
-          resource_type: 'auto',
-          public_id: fileName,
-          format: 'pdf'
+          resource_type: 'auto', // ✅ change this
+          format: 'pdf',
+          public_id: req.file.originalname.replace('.pdf', '')
         },
         (error, result) => {
-          if (error) return reject(error);
-          resolve(result);
+          if (error) reject(error);
+          else resolve(result);
         }
       );
 
@@ -46,7 +31,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
-      file_url: cloudResult.secure_url
+      file_url: cloudResult.secure_url.replace('/raw/upload/', '/image/upload/') // ✅ force image-style delivery
     });
 
     await newOrder.save();
@@ -60,6 +45,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
+
 
 
 // @route   GET /api/orders
