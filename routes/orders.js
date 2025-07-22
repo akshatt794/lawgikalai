@@ -1,23 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('../utils/cloudinary');
-const Order = require('../models/Order'); // ✅ import model
 const { Readable } = require('stream');
+const cloudinary = require('../config/cloudinary'); // adjust path if needed
+const Order = require('../models/Order');
 
-// Storage setup
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'lawgikalai-orders',
-    resource_type: 'raw',
-    format: async () => 'pdf'
-  }
-});
-
-
-// Temporary memory storage
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 router.post('/upload', upload.single('order'), async (req, res) => {
@@ -60,6 +48,8 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
+
+
 
 // @route   GET /api/orders
 // @desc    Get all orders or search by title starting with a letter
