@@ -15,29 +15,48 @@ const storage = new CloudinaryStorage({
   }
 });
 
+
+// Temporary memory storage
 const upload = multer({ storage });
 
-// ✅ POST /api/orders/upload — upload + save
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No PDF uploaded' });
 
-    const newOrder = new Order({
-      title: req.body.title || "Untitled",
-      file_name: req.file.originalname,
-      file_url: req.file.secure_url
+    const bufferStream = Readable.from(req.file.buffer);
+
+    const cloudResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'lawgikalai-orders',
+          resource_type: 'raw',
+          format: 'pdf',
+          public_id: req.file.originalname.replace('.pdf', '')
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+
+      bufferStream.pipe(stream);
     });
 
-    await newOrder.save(); // ✅ save to DB
+    const newOrder = new Order({
+      title: req.body.title || 'Untitled',
+      file_name: req.file.originalname,
+      file_url: cloudResult.secure_url
+    });
+
+    await newOrder.save();
 
     res.json({
       message: 'Order uploaded and saved successfully!',
       order: newOrder
     });
-
   } catch (err) {
-    console.error("❌ Upload error:", err);
-    res.status(500).json({ error: err.message });
+    console.error('❌ Upload error:', err);
+    res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
 
