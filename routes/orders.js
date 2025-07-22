@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { Readable } = require('stream');
-const cloudinary = require('../config/cloudinary'); // adjust path if needed
+const cloudinary = require('../config/cloudinary');
 const Order = require('../models/Order');
 
 const storage = multer.memoryStorage();
@@ -10,21 +10,26 @@ const upload = multer({ storage });
 
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No PDF uploaded' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-    const bufferStream = Readable.from(req.file.buffer);
+    const fileName = req.file.originalname.replace('.pdf', '');
+    const bufferStream = new Readable();
+    bufferStream.push(req.file.buffer);
+    bufferStream.push(null); // end the stream
 
     const cloudResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-orders',
           resource_type: 'raw',
-          format: 'pdf',
-          public_id: req.file.originalname.replace('.pdf', '')
+          public_id: fileName,
+          format: 'pdf'
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) return reject(error);
+          resolve(result);
         }
       );
 
@@ -48,7 +53,6 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
-
 
 
 // @route   GET /api/orders

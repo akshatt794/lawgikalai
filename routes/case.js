@@ -26,7 +26,8 @@ router.post('/add', verifyToken, async (req, res) => {
     const newCase = new Case(caseData);
     await newCase.save();
 
-    res.json({ message: 'Case added successfully', case: newCase });
+    // ✅ Only send message, no case data
+    res.json({ message: 'Case added successfully' });
   } catch (err) {
     res.status(500).json({ error: "Something broke!", details: err.message });
   }
