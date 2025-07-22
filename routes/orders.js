@@ -15,7 +15,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-orders',
-          resource_type: 'auto', // ✅ change this
+          resource_type: 'raw',  // ✅ Fix is here
           format: 'pdf',
           public_id: req.file.originalname.replace('.pdf', '')
         },
@@ -24,6 +24,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
           else resolve(result);
         }
       );
+      
 
       bufferStream.pipe(stream);
     });
