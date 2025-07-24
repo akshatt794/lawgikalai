@@ -230,8 +230,7 @@ router.post('/toggle-save', auth, async (req, res) => {
 
     res.json({
       message: alreadySaved ? 'News unsaved' : 'News saved',
-      saved: !alreadySaved,
-      savedNews: user.savedNews,
+      saved: !alreadySaved
     });
   } catch (err) {
     console.error('❌ Toggle save error:', err);
