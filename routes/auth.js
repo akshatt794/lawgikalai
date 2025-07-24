@@ -23,7 +23,6 @@ const auth = (req, res, next) => {
   }
 };
 
-
 // LOGIN
 router.post('/login', async (req, res) => {
   try {
@@ -43,7 +42,7 @@ router.post('/login', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        phoneNumber: user.phoneNumber
+        mobileNumber: user.phoneNumber
       }
     });
   } catch (err) {
@@ -51,6 +50,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
@@ -75,7 +75,7 @@ router.post('/signup', async (req, res) => {
     res.json({
       message: "Signup successful. OTP sent to email.",
       user_id: user._id,
-      phoneNumber: user.phoneNumber,
+      mobileNumber: user.phoneNumber,
       requires_verification: true
     });
   } catch (err) {
@@ -133,7 +133,7 @@ router.post('/verify-otp', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        phoneNumber: user.phoneNumber
+        mobileNumber: user.phoneNumber
       }
     });
   } catch (err) {
@@ -178,7 +178,7 @@ router.get('/profile', verifyToken, async (req, res) => {
       practice_areas: {}
     };
 
-    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration","Others"];
+    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration", "Others"];
     possibleAreas.forEach(area => {
       result.practice_areas[area] = user.practiceArea?.includes(area) || false;
     });
@@ -223,7 +223,7 @@ router.put('/profile', verifyToken, async (req, res) => {
     const areaList = Array.from(new Set([
       ...Object.keys(practice_areas || {}),
       ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
-      "Criminal","Civil","Family","Property","Corporate","IncomeTax","Arbitration","Others"
+      "Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration", "Others"
     ]));
 
     const resultPracticeAreas = {};
@@ -287,6 +287,7 @@ router.post('/save/:newsId', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 // DELETE ACCOUNT
 router.delete('/delete-account', auth, async (req, res) => {
   try {
@@ -298,15 +299,16 @@ router.delete('/delete-account', auth, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete account', details: err.message });
   }
 });
-//logout
+
+// LOGOUT
 router.post('/logout', auth, async (req, res) => {
   try {
-    // No server-side token invalidation — just inform client
     res.json({ message: 'Logout successful. Please clear your token on client side.' });
   } catch (err) {
     res.status(500).json({ error: 'Logout failed', details: err.message });
   }
 });
+
 // LOGIN WITH PHONE NUMBER
 router.post('/login-phone', async (req, res) => {
   try {
@@ -333,8 +335,8 @@ router.post('/login-phone', async (req, res) => {
       user: {
         id: user._id,
         name: user.fullName,
-        email: user.email,  // ✅ added email here
-        mobile_number: user.mobileNumber       
+        email: user.email,
+        mobileNumber: user.mobileNumber
       }
     });
   } catch (err) {
