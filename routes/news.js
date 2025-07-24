@@ -102,15 +102,34 @@ router.post('/save', auth, async (req, res) => {
 });
 
 // ========== Get Saved News ==========
+// ========== Get Saved News ==========
 router.get('/saved', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).populate('savedNews');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ savedNews: user.savedNews });
+
+    const formattedNews = user.savedNews.map(news => {
+      const options = {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      };
+
+      return {
+        ...news.toObject(),
+        createdAt: new Date(news.createdAt).toLocaleString('en-GB', options)  // ✅ dd/mm/yyyy, hh:mm AM/PM
+      };
+    });
+
+    res.json({ savedNews: formattedNews });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 // ✅ Public list of all news (alias for /all)
 // ✅ Paginated News List
 router.get('/list', async (req, res) => {
