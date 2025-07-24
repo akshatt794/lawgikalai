@@ -133,7 +133,7 @@ router.post('/verify-otp', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        mobileNumber: user.phoneNumber
+        mobileNumber: user.phoneNumber  // ✅ Add this line
       }
     });
   } catch (err) {
