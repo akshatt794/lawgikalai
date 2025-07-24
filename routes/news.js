@@ -204,7 +204,12 @@ router.post('/toggle-save', auth, async (req, res) => {
     const { newsId } = req.body;
     const userId = req.user?.userId;
 
+    console.log("➡️ Incoming toggle-save request");
+    console.log("📦 News ID:", newsId);
+    console.log("👤 User ID from token:", userId);
+
     if (!userId) return res.status(401).json({ error: 'Missing userId in token' });
+    if (!newsId) return res.status(400).json({ error: 'Missing newsId in request body' });
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -219,6 +224,8 @@ router.post('/toggle-save', auth, async (req, res) => {
 
     await user.save();
 
+    console.log("✅ News save status toggled");
+
     res.json({
       message: alreadySaved ? 'News unsaved' : 'News saved',
       saved: !alreadySaved,
@@ -226,9 +233,10 @@ router.post('/toggle-save', auth, async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Toggle save error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
+
 
 
 
