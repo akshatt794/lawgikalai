@@ -42,7 +42,7 @@ router.post('/login', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        mobileNumber: user.phoneNumber
+        mobileNumber: user.mobileNumber
       }
     });
   } catch (err) {
@@ -54,8 +54,8 @@ router.post('/login', async (req, res) => {
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
-    const { fullName, identifier, password, phoneNumber } = req.body;
-    if (!fullName || !identifier || !password || !phoneNumber) {
+    const { fullName, identifier, password, mobileNumber } = req.body;
+    if (!fullName || !identifier || !password || !mobileNumber) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -63,7 +63,7 @@ router.post('/signup', async (req, res) => {
     if (existing) return res.status(409).json({ error: 'User already exists' });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = new User({ fullName, identifier, password: hash, phoneNumber });
+    const user = new User({ fullName, identifier, password: hash, mobileNumber });
 
     const otp = '123456';
     user.otp = otp;
@@ -75,7 +75,7 @@ router.post('/signup', async (req, res) => {
     res.json({
       message: "Signup successful. OTP sent to email.",
       user_id: user._id,
-      mobileNumber: user.phoneNumber,
+      mobileNumber: user.mobileNumber,
       requires_verification: true
     });
   } catch (err) {
@@ -133,7 +133,7 @@ router.post('/verify-otp', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        mobileNumber: user.mobileNumber || user.phoneNumber // ✅ FIXED
+        mobileNumber: user.mobileNumber
       }
     });
   } catch (err) {
@@ -141,7 +141,6 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
-
 
 // RESEND OTP
 router.post('/resend-otp', async (req, res) => {
