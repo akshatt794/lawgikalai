@@ -36,11 +36,17 @@ router.post('/add', verifyToken, async (req, res) => {
 // ✅ Get case list for logged-in user with status filter
 router.get('/list', verifyToken, async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
-    const query = { userId: req.user.userId };
+    const { status, page = 1, limit = 10, search = '' } = req.query;
+    const query = {
+      userId: req.user.userId,
+    };
 
     if (status === 'ongoing') query.case_status = 'Ongoing';
     else if (status === 'closed') query.case_status = 'Closed';
+
+    if (search) {
+      query.case_title = { $regex: search, $options: 'i' }; // 🔍 case-insensitive title match
+    }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
