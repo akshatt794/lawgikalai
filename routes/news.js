@@ -201,8 +201,10 @@ router.delete('/save/:userId/:newsId', async (req, res) => {
 // POST /api/news/toggle-save/:newsId
 router.post('/toggle-save', auth, async (req, res) => {
   try {
-    const { newsId } = req.params;
-    const userId = req.user.body; // 👈 must match your jwt payload
+    const { newsId } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) return res.status(401).json({ error: 'Missing userId in token' });
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -227,6 +229,7 @@ router.post('/toggle-save', auth, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 
 module.exports = router;
