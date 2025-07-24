@@ -6,6 +6,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cloudinary = require('../utils/cloudinary');
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
@@ -44,21 +45,30 @@ function adminOnly(req, res, next) {
 router.post('/upload', upload.single('image'), async (req, res) => {
   try {
     const { title, content } = req.body;
-    const imageUrl = req.file ? `/uploads/news/${req.file.filename}` : null;
+
+    let imageUrl = null;
+    if (req.file) {
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'news'
+      });
+      imageUrl = uploadResult.secure_url;
+
+      // Optional: remove local file after upload
+      fs.unlinkSync(req.file.path);
+    }
 
     const news = new News({
       title,
       content,
-      image: imageUrl,
+      image: imageUrl
     });
+
     await news.save();
 
-    res.json({
-      message: "News uploaded!",
-      news: news
-    });
+    res.json({ message: 'News uploaded to Cloudinary!', news });
+
   } catch (err) {
-    console.error("Upload error:", err);
+    console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
