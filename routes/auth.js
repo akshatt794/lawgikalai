@@ -133,7 +133,7 @@ router.post('/verify-otp', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        mobileNumber: user.phoneNumber  // ✅ Add this line
+        mobileNumber: user.mobileNumber || user.phoneNumber // ✅ FIXED
       }
     });
   } catch (err) {
@@ -141,6 +141,7 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // RESEND OTP
 router.post('/resend-otp', async (req, res) => {
