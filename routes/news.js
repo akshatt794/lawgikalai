@@ -103,24 +103,23 @@ router.post('/save', auth, async (req, res) => {
 
 // ========== Get Saved News ==========
 // ========== Get Saved News ==========
+// ========== Get Saved News ==========
 router.get('/saved', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).populate('savedNews');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const formattedNews = user.savedNews.map(news => {
-      const options = {
+      const createdAt = new Date(news.createdAt);
+      const formattedDate = createdAt.toLocaleDateString('en-GB', {
         day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      };
+        month: 'long',
+        year: 'numeric'
+      }); // e.g., 12 July 2025
 
       return {
         ...news.toObject(),
-        createdAt: new Date(news.createdAt).toLocaleString('en-GB', options)  // ✅ dd/mm/yyyy, hh:mm AM/PM
+        createdAt: formattedDate
       };
     });
 
@@ -129,6 +128,7 @@ router.get('/saved', auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ✅ Public list of all news (alias for /all)
 // ✅ Paginated News List
