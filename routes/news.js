@@ -6,7 +6,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const cloudinary = require('../utils/cloudinary');
+const cloudinary = require('../config/cloudinary');
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
