@@ -75,44 +75,51 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
   }
 });
 // Upload PDF to Cloudinary and save in DB
-router.post('/upload-pdf', upload.single('document'), async (req, res) => {
+// ✅ Upload Multiple PDFs for Case
+router.post('/upload-pdf', upload.array('documents', 10), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
 
-    const bufferStream = Readable.from(req.file.buffer);
+    const uploadedFiles = await Promise.all(
+      req.files.map(file => {
+        const bufferStream = Readable.from(file.buffer);
 
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'lawgikalai-orders',
-          resource_type: 'raw',
-          type: 'upload',
-          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
-        },
-        (err, result) => (err ? reject(err) : resolve(result))
-      );
-      bufferStream.pipe(stream);
-    });
+        return new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'lawgikalai-documents',
+              resource_type: 'raw',
+              public_id: file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
+            },
+            (err, result) => {
+              if (err) {
+                console.error('❌ Upload error for file:', file.originalname, err);
+                return reject(err);
+              }
 
-    const inlineUrl = result.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
+              resolve({
+                file_name: file.originalname,
+                file_url: result.secure_url.replace('/upload/', '/upload/fl_attachment:false/'),
+              });
+            }
+          );
 
-    const newOrder = new Order({
-      title: req.body.title || 'Untitled',
-      file_name: req.file.originalname,
-      file_url: inlineUrl,
-    });
-
-    await newOrder.save();
+          bufferStream.pipe(stream);
+        });
+      })
+    );
 
     res.json({
-      message: 'PDF uploaded and saved successfully!',
-      order: newOrder
+      documents: uploadedFiles,
+      message: 'Files uploaded successfully',
     });
-
   } catch (err) {
-    console.error('❌ Upload Error:', err);
-    res.status(500).json({ error: 'Upload failed', details: err.message });
+    console.error('❌ Multi-upload error:', err);
+    res.status(500).json({ error: 'Failed to upload files', details: err.message });
   }
 });
+
 
 module.exports = router;
