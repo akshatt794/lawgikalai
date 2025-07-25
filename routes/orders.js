@@ -74,5 +74,45 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
+// Upload PDF to Cloudinary and save in DB
+router.post('/upload-pdf', upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const bufferStream = Readable.from(req.file.buffer);
+
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'lawgikalai-orders',
+          resource_type: 'raw',
+          type: 'upload',
+          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
+        },
+        (err, result) => (err ? reject(err) : resolve(result))
+      );
+      bufferStream.pipe(stream);
+    });
+
+    const inlineUrl = result.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
+
+    const newOrder = new Order({
+      title: req.body.title || 'Untitled',
+      file_name: req.file.originalname,
+      file_url: inlineUrl,
+    });
+
+    await newOrder.save();
+
+    res.json({
+      message: 'PDF uploaded and saved successfully!',
+      order: newOrder
+    });
+
+  } catch (err) {
+    console.error('❌ Upload Error:', err);
+    res.status(500).json({ error: 'Upload failed', details: err.message });
+  }
+});
 
 module.exports = router;
