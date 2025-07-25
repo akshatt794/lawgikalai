@@ -42,9 +42,24 @@ function adminOnly(req, res, next) {
   return next();
 }
 
+// ✅ Upload News with Full Details
 router.post('/upload', upload.single('image'), async (req, res) => {
   try {
-    const { title, content } = req.body;
+    const {
+      title,
+      content,
+      category,
+      date,
+      source,
+      summary,
+      fullUpdate,
+      sc_said,
+      announced_by,
+      applies_to,
+      legal_impact,
+      legal_sections,
+      createdAt
+    } = req.body;
 
     let imageUrl = null;
     if (req.file) {
@@ -52,24 +67,44 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         folder: 'news'
       });
       imageUrl = uploadResult.secure_url;
-
-      // Optional: remove local file after upload
       fs.unlinkSync(req.file.path);
     }
 
     const news = new News({
       title,
       content,
-      image: imageUrl
+      category,
+      date,
+      source,
+      summary,
+      fullUpdate,
+      sc_said,
+      announced_by,
+      applies_to,
+      legal_impact,
+      legal_sections: JSON.parse(legal_sections || '[]'),
+      image: imageUrl,
+      createdAt
     });
 
     await news.save();
-
-    res.json({ message: 'News uploaded to Cloudinary!', news });
+    res.json({ message: 'News uploaded with extended fields!', news });
 
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
+  }
+});
+
+// ✅ Related News by Category
+router.get('/related/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const relatedNews = await News.find({ category }).limit(6).sort({ createdAt: -1 });
+    res.json({ message: 'Related updates fetched', related: relatedNews });
+  } catch (err) {
+    console.error('Related fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch related news', details: err.message });
   }
 });
 

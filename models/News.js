@@ -1,13 +1,20 @@
 const mongoose = require('mongoose');
 
-const NewsSchema = new mongoose.Schema({
+const newsSchema = new mongoose.Schema({
   title: String,
-  content: String,
-  image: String,  // ✅ must be present
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+  category: String,
+  date: String,
+  source: String,
+  summary: String,
+  fullUpdate: String,
+  sc_said: String,
+  announced_by: String,
+  applies_to: String,
+  legal_impact: String,
+  legal_sections: [String],
+  image_url: String,
+  file_name: String,
+  createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('News', NewsSchema);
+module.exports = mongoose.model('News', newsSchema);
