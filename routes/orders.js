@@ -22,7 +22,8 @@ router.post('/upload', upload.single('order'), async (req, res) => {
           folder: 'lawgikalai-orders',
           resource_type: 'raw',
           type: 'upload',
-          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
+          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_'),
+          flags: 'attachment:false' // ✅ Makes the PDF open inline (in new tab)
         },
         (error, result) => {
           if (error) {
@@ -38,7 +39,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
-    // ✅ Just use the raw secure URL directly
+    // ✅ Save the file to MongoDB
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
