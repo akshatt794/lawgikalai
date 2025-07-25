@@ -64,6 +64,7 @@ app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/ai', require('./routes/aiDrafting'));
 app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api', ordersRoutes);
 
 // 5. Base route
 app.get('/', (req, res) => {
