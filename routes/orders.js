@@ -8,14 +8,10 @@ const Order = require('../models/Order');
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
     console.log("➡️ Upload route hit");
+
     if (!req.file) {
-      console.log("❌ No file received");
       return res.status(400).json({ error: 'No PDF uploaded' });
     }
-
-    console.log("📦 File received:", req.file.originalname);
-    console.log("📦 File type:", req.file.mimetype);
-    console.log("📦 File size:", req.file.size);
 
     const bufferStream = Readable.from(req.file.buffer);
 
@@ -23,7 +19,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-orders',
-          resource_type: 'auto', // ✅ THIS IS THE FIX
+          resource_type: 'raw', // ✅ THIS IS CRUCIAL
           type: 'upload',
           public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
         },
@@ -37,15 +33,14 @@ router.post('/upload', upload.single('order'), async (req, res) => {
           }
         }
       );
-    
+
       bufferStream.pipe(stream);
     });
-    
 
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
-      file_url: cloudResult.secure_url
+      file_url: cloudResult.secure_url // ✅ DIRECTLY USE THIS
     });
 
     await newOrder.save();
@@ -59,6 +54,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
+
 
 
 
