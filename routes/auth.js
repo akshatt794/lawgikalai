@@ -88,18 +88,37 @@ router.post('/signup', async (req, res) => {
 router.post('/forgot-password', async (req, res) => {
   try {
     const { identifier } = req.body;
-    const user = await User.findOne({ identifier });
+
+    if (!identifier) {
+      return res.status(400).json({ error: 'Identifier is required' });
+    }
+
+    // Check if identifier is email or mobile number
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+    const isMobile = /^[0-9]{10}$/.test(identifier); // adjust if needed (e.g. country codes)
+
+    let query = {};
+    if (isEmail) {
+      query = { email: identifier };
+    } else if (isMobile) {
+      query = { mobile: identifier };
+    } else {
+      return res.status(400).json({ error: 'Invalid identifier format' });
+    }
+
+    const user = await User.findOne(query);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Generate OTP (for now hardcoded, later make random)
     const otp = '123456';
     user.otp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 min
     await user.save();
 
     console.log(`OTP for ${identifier}: ${otp}`);
 
     res.json({
-      message: "OTP sent to email.",
+      message: `OTP sent to ${isEmail ? 'email' : 'mobile'}.`,
       user_id: user._id
     });
   } catch (err) {
@@ -107,6 +126,7 @@ router.post('/forgot-password', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 // CHANGE PASSWORD
 router.put('/change-password', verifyToken, async (req, res) => {
   try {
