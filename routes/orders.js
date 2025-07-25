@@ -56,3 +56,5 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
+
+module.exports = router;

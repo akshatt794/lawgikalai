@@ -36,7 +36,7 @@ router.get('/purchased', async (req, res) => {
       .sort({ startDate: -1 });
 
     res.json({
-      message: "🛒 Purchased plans fetched successfully",
+      message: "Purchased plans fetched successfully",
       count: purchasedPlans.length,
       purchases: purchasedPlans
     });
@@ -57,7 +57,7 @@ router.post('/purchase', async (req, res) => {
 
     await newPurchase.save();
 
-    res.status(201).json({ message: '✅ Purchase recorded', purchase: newPurchase });
+    res.status(201).json({ message: 'Purchase recorded', purchase: newPurchase });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

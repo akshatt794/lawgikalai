@@ -1,9 +1,9 @@
 require('dotenv').config();
-require("dotenv").config({ path: ".env.firebase" });
+require('dotenv').config({ path: '.env.firebase' });
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const exploreRoutes = require('./routes/exploreCourt');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -16,49 +16,58 @@ const ordersRoutes = require('./routes/orders');
 const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
 const courtRoutes = require('./routes/courts');
-const notificationRoutes = require('./routes/notification');
+const notificationRoutes = require('./routes/notifications');
 
-
-// Serve correct uploads directory (tmp for production on Render)
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
 const app = express();
-app.use('/api/home', homeRoutes);
 
-// 1. CORS (VERY TOP)
+// 1. CORS
 app.use(cors({
   origin: [
-    "http://localhost:5173",
-    "https://lawgikalai-admin.netlify.app"
+    'http://localhost:5173',
+    'https://lawgikalai-admin.netlify.app'
   ],
   credentials: true
 }));
-app.use('/api/explore', exploreCourtRoutes);
 
 // 2. Parse JSON
 app.use(express.json());
-app.use('/api/announcements', announcementRoutes);
 
-// 3. Serve uploads folder as static (PDF/image access)
+// 3. Serve uploads folder as static
 app.use('/uploads', express.static(servePath));
+console.log({
+  authRoutes,
+  newsRoutes,
+  exploreCourtRoutes,
+  homeRoutes,
+  caseRoutes,
+  documentRoutes,
+  ordersRoutes,
+  announcementRoutes,
+  subscriptionRoutes,
+  courtRoutes,
+  notificationRoutes,
+  aiDrafting: require('./routes/aiDrafting'),
+});
 
 // 4. API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/news', newsRoutes);
-app.use('/api/explore', exploreRoutes);
+app.use('/api/explore', exploreCourtRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/case', caseRoutes);
-app.use('/api', documentRoutes);
+app.use('/api/documents', documentRoutes); // Updated path
 app.use('/api/orders', ordersRoutes);
-app.use('/uploads', express.static('uploads'));
+app.use('/api/announcements', announcementRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/ai', require('./routes/aiDrafting'));
 app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // 5. Base route
-app.get("/", (req, res) => {
-  res.send("Welcome to Lawgikalai Auth API! 🚀");
+app.get('/', (req, res) => {
+  res.send('Welcome to Lawgikalai Auth API! 🚀');
 });
 
 // 6. MongoDB Connect
