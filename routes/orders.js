@@ -58,5 +58,21 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
+// Upload PDF route
+router.post('/upload-document', upload.single('document'), async (req, res) => {
+  try {
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: 'raw',
+    });
+
+    res.json({
+      message: 'File uploaded successfully',
+      file_name: req.file.originalname,
+      file_url: result.secure_url,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Upload failed', details: err.message });
+  }
+});
 
 module.exports = router;

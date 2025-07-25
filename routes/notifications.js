@@ -68,5 +68,6 @@ router.get('/list', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch notifications', details: err.message });
   }
 });
-module.exports = router; // ✅
+
+module.exports = router; 
 
