@@ -22,8 +22,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
           folder: 'lawgikalai-orders',
           resource_type: 'raw',
           type: 'upload',
-          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_'),
-          flags: 'attachment:false' // ✅ Makes the PDF open inline (in new tab)
+          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
         },
         (error, result) => {
           if (error) {
@@ -39,11 +38,13 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
-    // ✅ Save the file to MongoDB
+    // ✅ Modify URL to open in new tab (inline view)
+    const inlineUrl = cloudResult.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
+
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
-      file_url: cloudResult.secure_url
+      file_url: inlineUrl
     });
 
     await newOrder.save();
