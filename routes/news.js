@@ -225,19 +225,27 @@ router.post('/add', auth, async (req, res) => {
   }
 });
 
-router.delete('/save/:userId/:newsId', async (req, res) => {
-  const { userId, newsId } = req.params;
+router.delete('/save/:newsId', auth, async (req, res) => {
+  const userId = req.user.userId; // ✅ pulled from token
+  const { newsId } = req.params;
+
   try {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
+
     user.savedNews = user.savedNews.filter(id => id.toString() !== newsId);
     await user.save();
-    res.json({ message: 'News removed from saved list', savedNews: user.savedNews });
+
+    res.json({
+      message: 'News removed from saved list',
+      savedNews: user.savedNews
+    });
   } catch (err) {
     console.error('Error deleting saved news:', err);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
+
 
 router.post('/toggle-save', auth, async (req, res) => {
   try {
