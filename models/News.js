@@ -13,8 +13,7 @@ const newsSchema = new mongoose.Schema({
   legal_impact: String,
   legal_sections: [String],
   image_url: String,
-  file_name: String,
-  createdAt: { type: Date, default: Date.now }
-});
+  file_name: String
+}, { timestamps: true }); // ✅ Adds createdAt & updatedAt automatically
 
 module.exports = mongoose.model('News', newsSchema);

@@ -11,7 +11,9 @@ router.get('/', verifyToken, async (req, res) => {
     const userId = req.user.userId;
 
     // 1. Get last 10 announcements
-    const announcements = await Announcement.find().sort({ createdAt: -1 }).limit(10);
+    const announcements = await Announcement.find()
+      .sort({ createdAt: -1 })
+      .limit(10);
 
     // 2. Get nearest upcoming case for the user
     const nearestCase = await Case.findOne({
@@ -29,12 +31,11 @@ router.get('/', verifyToken, async (req, res) => {
     });
     const closed = await Case.countDocuments({ userId, case_status: 'Closed' });
 
-    // 4. Get top 10 news
+    // 4. Get latest top 10 news
     const news = await News.find()
-  .sort({ createdAt: -1 })
-  .limit(10)
-  .select('title content image'); // ✅ image is included herenclude content 
-
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('title content image createdAt');
 
     res.json({
       message: "Home data fetched",
@@ -49,6 +50,7 @@ router.get('/', verifyToken, async (req, res) => {
     });
 
   } catch (err) {
+    console.error('❌ Home route error:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
