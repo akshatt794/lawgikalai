@@ -2,7 +2,7 @@ const { Readable } = require('stream');
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/multer');
-const cloudinary = require('../config/cloudinary'); // Make sure this exists
+const cloudinary = require('../config/cloudinary');
 const Order = require('../models/Order');
 
 // ✅ Upload PDF Order
@@ -38,14 +38,11 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
-    // ✅ Generate viewable URL (remove `/raw/` so it opens in tab)
-    const secureUrl = cloudResult.secure_url;
-    const viewableUrl = secureUrl.replace('/raw/', '/');
-
+    // ✅ Just use the raw secure URL directly
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
-      file_url: viewableUrl // ✅ this now opens in browser tab
+      file_url: cloudResult.secure_url
     });
 
     await newOrder.save();
@@ -59,38 +56,3 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
-
-
-// ✅ GET all orders (with optional title search and pagination)
-router.get('/', async (req, res) => {
-  try {
-    const { title, page = 1, limit = 10 } = req.query;
-
-    const query = {};
-    if (title) {
-      query.title = { $regex: `^${title}`, $options: 'i' };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const orders = await Order.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Order.countDocuments(query);
-
-    res.json({
-      message: "Orders fetched successfully",
-      currentPage: parseInt(page),
-      totalPages: Math.ceil(total / limit),
-      totalItems: total,
-      count: orders.length,
-      orders
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-module.exports = router;
