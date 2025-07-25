@@ -5,6 +5,7 @@ const upload = require('../middleware/multer');
 const cloudinary = require('../config/cloudinary'); // Make sure this exists
 const Order = require('../models/Order');
 
+// ✅ Upload PDF Order
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
     console.log("➡️ Upload route hit");
@@ -19,7 +20,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-orders',
-          resource_type: 'raw', // ✅ THIS IS CRUCIAL
+          resource_type: 'raw',
           type: 'upload',
           public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
         },
@@ -37,10 +38,14 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
+    // ✅ Generate viewable URL (remove `/raw/` so it opens in tab)
+    const secureUrl = cloudResult.secure_url;
+    const viewableUrl = secureUrl.replace('/raw/', '/');
+
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
-      file_url: cloudResult.secure_url // ✅ DIRECTLY USE THIS
+      file_url: viewableUrl // ✅ this now opens in browser tab
     });
 
     await newOrder.save();
@@ -56,18 +61,14 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 });
 
 
-
-
-// @route   GET /api/orders
-// @desc    Get all orders or search by title starting with a letter
-// ✅ GET /api/orders — fetch all orders or filter by title
+// ✅ GET all orders (with optional title search and pagination)
 router.get('/', async (req, res) => {
   try {
     const { title, page = 1, limit = 10 } = req.query;
 
     const query = {};
     if (title) {
-      query.title = { $regex: `^${title}`, $options: 'i' }; // Optional search
+      query.title = { $regex: `^${title}`, $options: 'i' };
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -91,6 +92,5 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 module.exports = router;
