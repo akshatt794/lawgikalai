@@ -48,7 +48,7 @@ router.post('/send', verifyToken, async (req, res) => {
     const savedNotification = await Notification.create({
       title,
       body,
-      user: user._id
+      userId: user._id
     });
 
     res.json({ success: true, fcmResponse, savedNotification });
@@ -60,8 +60,8 @@ router.post('/send', verifyToken, async (req, res) => {
 // ✅ Get notification list for the logged-in user
 router.get('/list', verifyToken, async (req, res) => {
   try {
-    const notifications = await Notification.find({ user: req.user.userId })
-      .sort({ createdAt: -1 });
+    const notifications = await Notification.find({ userId: req.user.userId })
+    .sort({ createdAt: -1 });
 
     res.json({ notifications });
   } catch (err) {
