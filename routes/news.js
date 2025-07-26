@@ -207,19 +207,30 @@ router.get('/:newsId', async (req, res) => {
     }
 
     const newsItem = await News.findById(newsId);
-    if (!newsItem) return res.status(404).json({ error: 'News not found' });
+    if (!newsItem) {
+      return res.status(404).json({ error: 'News not found' });
+    }
 
-    const imageUrl = newsItem.image?.startsWith('/uploads') ? `${BASE_URL}${newsItem.image}` : newsItem.image;
+    const imageUrl = newsItem.image?.startsWith('/uploads')
+      ? `${BASE_URL}${newsItem.image}`
+      : newsItem.image;
 
-    res.json({
-      ...newsItem.toObject(),
-      image: imageUrl,
-      isSaved
+    res.status(200).json({
+      message: 'News by ID fetched successfully',
+      news: {
+        ...newsItem.toObject(),
+        image: imageUrl,
+        isSaved
+      }
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch news item', details: err.message });
+    res.status(500).json({
+      error: 'Failed to fetch news item',
+      details: err.message
+    });
   }
 });
+
 
 router.post('/add', auth, async (req, res) => {
   try {
