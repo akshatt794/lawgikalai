@@ -89,7 +89,7 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-documents',
-          resource_type: 'raw', // ✅ use 'auto' to allow browser preview
+          resource_type: 'auto', // ✅ Critical
           public_id: req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
           use_filename: true,
           unique_filename: false
@@ -102,10 +102,8 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
 
       bufferStream.pipe(stream);
     });
-    const cloudName = 'dvmo54d9x'; // your Cloudinary cloud name
 
-    const fileUrl = result.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
-    
+    const fileUrl = result.secure_url; // ✅ Keep original URL
 
     res.json({
       documents: [
@@ -116,12 +114,12 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       ],
       message: 'Document uploaded successfully!'
     });
-
   } catch (err) {
     console.error('❌ Upload error:', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
+
 // ✅ Get Orders by optional title
 router.get('/', async (req, res) => {
   try {
