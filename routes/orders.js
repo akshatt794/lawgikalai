@@ -4,6 +4,7 @@ const router = express.Router();
 const upload = require('../middleware/multer');
 const cloudinary = require('../config/cloudinary');
 const Order = require('../models/Order');
+const streamifier = require('streamifier'); // if not imported already
 
 // ✅ Upload PDF Order
 router.post('/upload', upload.single('order'), async (req, res) => {
@@ -76,48 +77,47 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
 });
 // Upload PDF to Cloudinary and save in DB
 // ✅ Upload Multiple PDFs for Case
-router.post('/upload-pdf', upload.array('documents', 10), async (req, res) => {
+router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: 'No files uploaded' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No document uploaded' });
     }
 
-    const uploadedFiles = await Promise.all(
-      req.files.map(file => {
-        const bufferStream = Readable.from(file.buffer);
+    const bufferStream = Readable.from(req.file.buffer);
 
-        return new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'lawgikalai-documents',
-              resource_type: 'raw',
-              public_id: file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
-            },
-            (err, result) => {
-              if (err) {
-                console.error('❌ Upload error for file:', file.originalname, err);
-                return reject(err);
-              }
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'lawgikalai-documents',
+          resource_type: 'auto', // ✅ use 'auto' to allow browser preview
+          public_id: req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
+          use_filename: true,
+          unique_filename: false
+        },
+        (err, uploadResult) => {
+          if (err) return reject(err);
+          resolve(uploadResult);
+        }
+      );
 
-              resolve({
-                file_name: file.originalname,
-                file_url: result.secure_url.replace('/upload/', '/upload/fl_attachment:false/'),
-              });
-            }
-          );
+      bufferStream.pipe(stream);
+    });
 
-          bufferStream.pipe(stream);
-        });
-      })
-    );
+    const fileUrl = result.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
 
     res.json({
-      documents: uploadedFiles,
-      message: 'Files uploaded successfully',
+      documents: [
+        {
+          file_name: req.file.originalname,
+          file_url: fileUrl
+        }
+      ],
+      message: 'Document uploaded successfully!'
     });
+
   } catch (err) {
-    console.error('❌ Multi-upload error:', err);
-    res.status(500).json({ error: 'Failed to upload files', details: err.message });
+    console.error('❌ Upload error:', err);
+    res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
 
