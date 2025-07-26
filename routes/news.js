@@ -202,16 +202,43 @@ router.get('/list', async (req, res) => {
 router.get('/:newsId', async (req, res) => {
   try {
     const newsId = req.params.newsId;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    let userId = null;
+    let isSaved = false;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+
+        const user = await User.findById(userId);
+        if (user && Array.isArray(user.savedNews)) {
+          isSaved = user.savedNews.some(id => id.toString() === newsId);
+        }
+      } catch (err) {
+        console.warn('Token verification failed or user not found:', err.message);
+        // continue without breaking
+      }
+    }
+
     const newsItem = await News.findById(newsId);
     if (!newsItem) return res.status(404).json({ error: "News not found" });
 
-    const imageUrl = newsItem.image?.startsWith('/uploads') ? `${BASE_URL}${newsItem.image}` : newsItem.image;
+    const imageUrl = newsItem.image?.startsWith('/uploads')
+      ? `${BASE_URL}${newsItem.image}`
+      : newsItem.image;
 
-    res.json({ ...newsItem.toObject(), image: imageUrl });
+    res.json({
+      ...newsItem.toObject(),
+      image: imageUrl,
+      isSaved
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch news item", details: err.message });
   }
 });
+
 
 router.post('/add', auth, async (req, res) => {
   try {

@@ -215,22 +215,23 @@ router.get('/profile', verifyToken, async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const result = {
-      full_name: user.fullName || "NIL",
-      mobile_number: user.mobileNumber || "NIL",
-      email: user.email || "NIL",
-      bar_council_id: user.barCouncilId || "NIL",
-      qualification: user.qualification || "NIL",
-      experience: user.experience || "NIL",
-      practice_areas: {}
-    };
-
+    const practiceAreas = Array.isArray(user.practiceArea) ? user.practiceArea : [];
     const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration", "Others"];
+
+    const practice_areas = {};
     possibleAreas.forEach(area => {
-      result.practice_areas[area] = user.practiceArea?.includes(area) || false;
+      practice_areas[area] = practiceAreas.includes(area);
     });
 
-    res.json(result);
+    res.json({
+      full_name: user.fullName,
+      mobile_number: user.mobileNumber,
+      email: user.email,
+      bar_council_id: user.barCouncilId,
+      qualification: user.qualification,
+      experience: user.experience,
+      practice_areas
+    });
   } catch (err) {
     res.status(500).json({ error: "Server error", details: err.message });
   }
