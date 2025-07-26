@@ -17,7 +17,6 @@ const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
 const courtRoutes = require('./routes/courts');
 const notificationRoutes = require('./routes/notifications');
-const pdfRoutes = require('./routes/pdf');
 
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
@@ -77,7 +76,6 @@ app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', ordersRoutes);
 app.use(express.json());
-app.use('/api/pdf', pdfRoutes);
 // 5. Base route
 app.get('/', (req, res) => {
   res.send('Welcome to Lawgikalai Auth API! 🚀');
