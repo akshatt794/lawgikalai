@@ -214,6 +214,8 @@ router.get('/:newsId', async (req, res) => {
 
         const user = await User.findById(userId);
         if (user && Array.isArray(user.savedNews)) {
+          console.log('Checking savedNews:', user.savedNews.map(id => id.toString()));
+          console.log('Looking for:', newsId);
           isSaved = user.savedNews.map(id => id.toString()).includes(newsId.toString());
         }
       } catch (err) {
