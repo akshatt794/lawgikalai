@@ -89,7 +89,7 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-documents',
-          resource_type: 'auto', // ✅ use 'auto' to allow browser preview
+          resource_type: 'raw', // ✅ use 'auto' to allow browser preview
           public_id: req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
           use_filename: true,
           unique_filename: false
@@ -104,10 +104,8 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     });
     const cloudName = 'dvmo54d9x'; // your Cloudinary cloud name
 
-    const fileUrl = result.secure_url
-  .replace('/image/upload/', '/raw/upload/fl_attachment:false/')
-  .replace('/auto/upload/', '/raw/upload/fl_attachment:false/')
-  .replace('/upload/', '/raw/upload/fl_attachment:false/');
+    const fileUrl = result.secure_url;
+
     
 
     res.json({
