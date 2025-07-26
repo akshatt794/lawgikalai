@@ -283,12 +283,12 @@ router.put('/profile', verifyToken, async (req, res) => {
       message: "Profile updated successfully",
       status: true,
       data: {
-        full_name: user.fullName || "NIL",
-        mobile_number: user.mobileNumber || "NIL",
-        email: user.email || "NIL",
-        bar_council_id: user.barCouncilId || "NIL",
-        qualification: user.qualification || "NIL",
-        experience: user.experience || "NIL",
+        full_name: user.fullName || "",
+        mobile_number: user.mobileNumber || "",
+        email: user.email || "",
+        bar_council_id: user.barCouncilId || "",
+        qualification: user.qualification || "",
+        experience: user.experience || "",
         practice_areas: resultPracticeAreas
       }
     });
