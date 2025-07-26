@@ -89,7 +89,7 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-documents',
-          resource_type: 'auto', // ✅ Critical
+          resource_type: 'raw', // ✅ Critical
           public_id: req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
           use_filename: true,
           unique_filename: false
