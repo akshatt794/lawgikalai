@@ -89,7 +89,7 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'lawgikalai-documents',
-          resource_type: 'raw', // ✅ Critical
+          resource_type: 'raw',
           public_id: req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
           use_filename: true,
           unique_filename: false
@@ -103,18 +103,21 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
-    const fileUrl = result.secure_url; // ✅ Keep original URL
+    const fileName = req.file.originalname;
+    const cloudinaryRawUrl = result.secure_url;
+    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(cloudinaryRawUrl)}`;
 
+    // ✅ Response without file_url
     res.json({
       documents: [
         {
-          file_name: req.file.originalname,
-          file_url: fileUrl, // ← Use this in iframe via Google Docs
-          embed_url: `https://docs.google.com/gview?embedded=true&url=${fileUrl}`
+          file_name: fileName,
+          embed_url: embedUrl
         }
       ],
       message: 'Document uploaded successfully!'
     });
+
   } catch (err) {
     console.error('❌ Upload error:', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
