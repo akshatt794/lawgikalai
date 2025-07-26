@@ -109,7 +109,8 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       documents: [
         {
           file_name: req.file.originalname,
-          file_url: fileUrl
+          file_url: fileUrl, // ← Use this in iframe via Google Docs
+          embed_url: `https://docs.google.com/gview?embedded=true&url=${fileUrl}`
         }
       ],
       message: 'Document uploaded successfully!'
