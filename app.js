@@ -43,6 +43,8 @@ app.use('/uploads', express.static('uploads', {
     }
   }
 }));
+console.log('Checking savedNews:', user.savedNews.map(id => id.toString()));
+console.log('Looking for:', newsId);
 
 console.log({
   authRoutes,
