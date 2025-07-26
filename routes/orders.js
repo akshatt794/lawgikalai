@@ -123,6 +123,28 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
+// ✅ Get Orders by optional title
+router.get('/', async (req, res) => {
+  try {
+    const { title } = req.query;
+
+    const query = {};
+    if (title) {
+      query.title = { $regex: new RegExp(title, 'i') }; // case-insensitive partial match
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+
+    res.json({
+      message: 'Orders fetched successfully',
+      count: orders.length,
+      data: orders
+    });
+  } catch (err) {
+    console.error('❌ Error fetching orders:', err);
+    res.status(500).json({ error: 'Failed to fetch orders', details: err.message });
+  }
+});
 
 
 module.exports = router;
