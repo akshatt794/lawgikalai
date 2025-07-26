@@ -103,7 +103,11 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
-    const fileUrl = result.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
+    const fileUrl = result.secure_url.replace(
+      `/${result.resource_type}/upload/`,
+      `/${result.resource_type}/upload/fl_attachment:false/`
+    );
+    
 
     res.json({
       documents: [
