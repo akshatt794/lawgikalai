@@ -35,7 +35,15 @@ app.use(cors({
 app.use(express.json());
 
 // 3. Serve uploads folder as static
-app.use('/uploads', express.static(servePath));
+app.use('/uploads', express.static('uploads', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline'); // ✅ forces open in new tab
+    }
+  }
+}));
+
 console.log({
   authRoutes,
   newsRoutes,
