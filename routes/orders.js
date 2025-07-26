@@ -40,19 +40,19 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     });
 
     const fileName = req.file.originalname;
-    const fileUrl = cloudResult.secure_url;
-    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
+    const inlineUrl = cloudResult.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
+    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(inlineUrl)}`;
 
-    // ✅ Save to DB with file_url (if needed later)
+    // ✅ Save to DB with inline preview link
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: fileName,
-      file_url: fileUrl // still stored in DB
+      file_url: inlineUrl
     });
 
     await newOrder.save();
 
-    // ✅ Only return embed_url in response
+    // ✅ Keep response structure same, only return embed_url
     res.json({
       message: 'Order uploaded and saved successfully!',
       order: {
@@ -66,7 +66,6 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
-
 // Upload PDF route
 router.post('/upload-document', upload.single('document'), async (req, res) => {
   try {
