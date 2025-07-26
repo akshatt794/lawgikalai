@@ -214,11 +214,10 @@ router.get('/:newsId', async (req, res) => {
 
         const user = await User.findById(userId);
         if (user && Array.isArray(user.savedNews)) {
-          isSaved = user.savedNews.some(id => id.toString() === newsId);
+          isSaved = user.savedNews.map(id => id.toString()).includes(newsId.toString());
         }
       } catch (err) {
         console.warn('Token verification failed or user not found:', err.message);
-        // continue without breaking
       }
     }
 
@@ -238,6 +237,7 @@ router.get('/:newsId', async (req, res) => {
     res.status(500).json({ error: "Failed to fetch news item", details: err.message });
   }
 });
+
 
 
 router.post('/add', auth, async (req, res) => {
