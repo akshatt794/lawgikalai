@@ -39,26 +39,23 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       bufferStream.pipe(stream);
     });
 
-    const fileName = req.file.originalname;
+    // ➕ Construct Google Docs embeddable URL
     const inlineUrl = cloudResult.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
     const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(inlineUrl)}`;
 
-    // ✅ Save to DB with inline preview link
+    // 📌 Save in DB with original structure
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
-      file_name: fileName,
-      file_url: inlineUrl
+      file_name: req.file.originalname,
+      file_url: embedUrl
     });
 
-    await newOrder.save();
+    const savedOrder = await newOrder.save();
 
-    // ✅ Keep response structure same, only return embed_url
+    // ✅ Send full object (ID, title, file_name, file_url, createdAt, __v)
     res.json({
       message: 'Order uploaded and saved successfully!',
-      order: {
-        file_name: fileName,
-        embed_url: embedUrl
-      }
+      order: savedOrder
     });
 
   } catch (err) {
