@@ -104,10 +104,10 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     });
     const cloudName = 'dvmo54d9x'; // your Cloudinary cloud name
 
-    const fileUrl = result.secure_url.replace(
-      `/${result.resource_type}/upload/`,
-      `/${result.resource_type}/upload/fl_attachment:false/`
-    );
+    const fileUrl = result.secure_url
+  .replace('/image/upload/', '/raw/upload/fl_attachment:false/')
+  .replace('/auto/upload/', '/raw/upload/fl_attachment:false/')
+  .replace('/upload/', '/raw/upload/fl_attachment:false/');
     
 
     res.json({
