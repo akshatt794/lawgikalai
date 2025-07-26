@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Document Upload API
-router.post('/upload-document', upload.single('document'), (req, res) => {
+router.post('/upload-document', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No document uploaded' });
   }
