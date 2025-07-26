@@ -8,11 +8,9 @@ const path = require('path');
 const fs = require('fs');
 const cloudinary = require('../config/cloudinary');
 
-// JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
-// ----------- Dynamic Upload Directory Setup -----------
 const UPLOAD_DIR = process.env.NODE_ENV === 'production' ? '/tmp/uploads/news' : 'uploads/news';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -38,27 +36,22 @@ function auth(req, res, next) {
   }
 }
 
-function adminOnly(req, res, next) {
-  return next();
+function getUserIdFromToken(req) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return null;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return decoded.userId;
+  } catch {
+    return null;
+  }
 }
 
-// ✅ Upload News with Full Details
 router.post('/upload', upload.single('image'), async (req, res) => {
   try {
     const {
-      title,
-      content,
-      category,
-      date,
-      source,
-      summary,
-      fullUpdate,
-      sc_said,
-      announced_by,
-      applies_to,
-      legal_impact,
-      legal_sections,
-      createdAt
+      title, content, category, date, source, summary, fullUpdate,
+      sc_said, announced_by, applies_to, legal_impact, legal_sections, createdAt
     } = req.body;
 
     let imageUrl = null;
@@ -71,32 +64,20 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     }
 
     const news = new News({
-      title,
-      content,
-      category,
-      date,
-      source,
-      summary,
-      fullUpdate,
-      sc_said,
-      announced_by,
-      applies_to,
-      legal_impact,
+      title, content, category, date, source, summary, fullUpdate,
+      sc_said, announced_by, applies_to, legal_impact,
       legal_sections: JSON.parse(legal_sections || '[]'),
-      image: imageUrl,
-      createdAt
+      image: imageUrl, createdAt
     });
 
     await news.save();
     res.json({ message: 'News uploaded with extended fields!', news });
-
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
 
-// ✅ Related News by Category
 router.get('/related/:category', async (req, res) => {
   try {
     const { category } = req.params;
@@ -111,9 +92,19 @@ router.get('/related/:category', async (req, res) => {
 router.get('/all', async (req, res) => {
   try {
     const news = await News.find().sort({ createdAt: -1 });
+    const userId = getUserIdFromToken(req);
+    let savedIds = [];
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user?.savedNews) {
+        savedIds = user.savedNews.map(id => id?.toString()).filter(Boolean);
+      }
+    }
+
     const formatted = news.map(n => ({
       ...n.toObject(),
       image: n.image?.startsWith('/uploads') ? `${BASE_URL}${n.image}` : n.image,
+      isSaved: savedIds.includes(n._id.toString())
     }));
     res.json({ news: formatted });
   } catch (err) {
@@ -147,17 +138,14 @@ router.get('/saved', auth, async (req, res) => {
     const formattedNews = user.savedNews.map(news => {
       const createdAt = new Date(news.createdAt);
       const formattedDate = createdAt.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
+        day: '2-digit', month: 'long', year: 'numeric'
       });
-
       const imageUrl = news.image?.startsWith('/uploads') ? `${BASE_URL}${news.image}` : news.image;
-
       return {
         ...news.toObject(),
         image: imageUrl,
-        createdAt: formattedDate
+        createdAt: formattedDate,
+        isSaved: true
       };
     });
 
@@ -173,21 +161,26 @@ router.get('/list', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const news = await News.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .select('title content image createdAt');
-
+    const news = await News.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
     const total = await News.countDocuments();
+
+    const userId = getUserIdFromToken(req);
+    let savedIds = [];
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user?.savedNews) {
+        savedIds = user.savedNews.map(id => id?.toString()).filter(Boolean);
+      }
+    }
 
     const formatted = news.map(n => ({
       ...n.toObject(),
       image: n.image?.startsWith('/uploads') ? `${BASE_URL}${n.image}` : n.image,
+      isSaved: savedIds.includes(n._id.toString())
     }));
 
     res.json({
-      message: "News list fetched",
+      message: 'News list fetched',
       currentPage: page,
       totalPages: Math.ceil(total / limit),
       totalItems: total,
@@ -195,40 +188,28 @@ router.get('/list', async (req, res) => {
       data: formatted
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch news", details: err.message });
+    res.status(500).json({ error: 'Failed to fetch news', details: err.message });
   }
 });
 
 router.get('/:newsId', async (req, res) => {
   try {
     const newsId = req.params.newsId;
-    const token = req.headers.authorization?.split(' ')[1];
-
-    let userId = null;
+    const userId = getUserIdFromToken(req);
     let isSaved = false;
 
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.userId;
-
-        const user = await User.findById(userId);
-        if (user && Array.isArray(user.savedNews)) {
-          console.log('Checking savedNews:', user.savedNews.map(id => id.toString()));
-          console.log('Looking for:', newsId);
-          isSaved = user.savedNews.map(id => id.toString()).includes(newsId.toString());
-        }
-      } catch (err) {
-        console.warn('Token verification failed or user not found:', err.message);
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user?.savedNews) {
+        const saved = user.savedNews.map(id => id?.toString()).filter(Boolean);
+        isSaved = saved.includes(newsId.toString());
       }
     }
 
     const newsItem = await News.findById(newsId);
-    if (!newsItem) return res.status(404).json({ error: "News not found" });
+    if (!newsItem) return res.status(404).json({ error: 'News not found' });
 
-    const imageUrl = newsItem.image?.startsWith('/uploads')
-      ? `${BASE_URL}${newsItem.image}`
-      : newsItem.image;
+    const imageUrl = newsItem.image?.startsWith('/uploads') ? `${BASE_URL}${newsItem.image}` : newsItem.image;
 
     res.json({
       ...newsItem.toObject(),
@@ -236,33 +217,30 @@ router.get('/:newsId', async (req, res) => {
       isSaved
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch news item", details: err.message });
+    res.status(500).json({ error: 'Failed to fetch news item', details: err.message });
   }
 });
-
-
 
 router.post('/add', auth, async (req, res) => {
   try {
     const { title, content, image, publishedAt, source } = req.body;
-
     const news = new News({ title, content, image, publishedAt, source });
     await news.save();
-    res.status(201).json({ message: "News added", news });
+    res.status(201).json({ message: 'News added', news });
   } catch (err) {
-    res.status(500).json({ error: "Failed to add news", details: err.message });
+    res.status(500).json({ error: 'Failed to add news', details: err.message });
   }
 });
 
 router.delete('/save/:newsId', auth, async (req, res) => {
-  const userId = req.user.userId; // ✅ pulled from token
+  const userId = req.user.userId;
   const { newsId } = req.params;
 
   try {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    user.savedNews = user.savedNews.filter(id => id.toString() !== newsId);
+    user.savedNews = user.savedNews.filter(id => id?.toString() !== newsId);
     await user.save();
 
     res.json({
@@ -274,7 +252,6 @@ router.delete('/save/:newsId', auth, async (req, res) => {
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
-
 
 router.post('/toggle-save', auth, async (req, res) => {
   try {
@@ -291,7 +268,7 @@ router.post('/toggle-save', auth, async (req, res) => {
       user.savedNews = [];
     }
 
-    const savedNewsStringList = user.savedNews.map(id => id?.toString());
+    const savedNewsStringList = user.savedNews.map(id => id?.toString()).filter(Boolean);
     const alreadySaved = savedNewsStringList.includes(newsId);
 
     if (alreadySaved) {
