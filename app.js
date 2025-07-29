@@ -84,7 +84,7 @@ app.get('/', (req, res) => {
 // 6. MongoDB Connect
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true
-});
+})
 
 .then(() => console.log('MongoDB connected'))
 .catch((err) => console.error('MongoDB connection error:', err));
