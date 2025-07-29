@@ -1,13 +1,13 @@
 const { Client } = require('@opensearch-project/opensearch');
 
 const osClient = new Client({
-  node: process.env.OPENSEARCH_ENDPOINT, // e.g. 'https://search-your-domain.ap-south-1.es.amazonaws.com'
+  node: process.env.OPENSEARCH_URL || 'https://your-opensearch-endpoint.amazonaws.com',
   auth: {
-    username: process.env.OPENSEARCH_USERNAME,
-    password: process.env.OPENSEARCH_PASSWORD
+    username: process.env.OPENSEARCH_USERNAME || 'admin',
+    password: process.env.OPENSEARCH_PASSWORD || 'admin'
   },
   ssl: {
-    rejectUnauthorized: false // only use in dev mode if needed
+    rejectUnauthorized: false // Set to true if using valid certs
   }
 });
 
