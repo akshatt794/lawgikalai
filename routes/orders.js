@@ -2,11 +2,31 @@ const { Readable } = require('stream');
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/multer');
-const cloudinary = require('../config/cloudinary');
 const Order = require('../models/Order');
-const streamifier = require('streamifier'); // if not imported already
+const pdfParse = require('pdf-parse');
+const osClient = require('../utils/osClient');
+const s3 = require('../config/s3'); // ✅ added
+const path = require('path');
 
-// ✅ Upload PDF Order
+// Helper to parse and index PDF
+async function parseAndIndexPDF(fileBuffer, metadata) {
+  const data = await pdfParse(fileBuffer);
+
+  const doc = {
+    title: metadata.title,
+    uploaded_by: metadata.userId,
+    uploaded_at: new Date().toISOString(),
+    content: data.text,
+    file_url: metadata.fileUrl
+  };
+
+  return await osClient.index({
+    index: 'pdf_documents',
+    body: doc
+  });
+}
+
+// ✅ Upload PDF Order (uses S3 now)
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
     console.log("➡️ Upload route hit");
@@ -15,35 +35,20 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       return res.status(400).json({ error: 'No PDF uploaded' });
     }
 
-    const bufferStream = Readable.from(req.file.buffer);
+    // S3 Upload
+    const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
+    const s3Upload = await s3.upload({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: s3Key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+      ACL: 'public-read'
+    }).promise();
 
-    const cloudResult = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'lawgikalai-orders',
-          resource_type: 'raw',
-          type: 'upload',
-          public_id: req.file.originalname.replace(/\.pdf$/, '').replace(/\s+/g, '_')
-        },
-        (error, result) => {
-          if (error) {
-            console.error("❌ Cloudinary upload error:", error);
-            reject(error);
-          } else {
-            console.log("✅ Uploaded to Cloudinary:", result.secure_url);
-            resolve(result);
-          }
-        }
-      );
+    const fileUrl = s3Upload.Location;
+    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
 
-      bufferStream.pipe(stream);
-    });
-
-    // ➕ Construct Google Docs embeddable URL
-    const inlineUrl = cloudResult.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
-    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(inlineUrl)}`;
-
-    // 📌 Save in DB with original structure
+    // Save in DB
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
@@ -52,7 +57,13 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // ✅ Send full object (ID, title, file_name, file_url, createdAt, __v)
+    // Index content to OpenSearch
+    await parseAndIndexPDF(req.file.buffer, {
+      title: newOrder.title,
+      fileUrl: fileUrl,
+      userId: req.user?.id || 'anonymous'
+    });
+
     res.json({
       message: 'Order uploaded and saved successfully!',
       order: savedOrder
@@ -63,9 +74,11 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     res.status(500).json({ error: 'Something broke!', details: err.message });
   }
 });
-// Upload PDF route
+
+// Upload PDF route (still uses Cloudinary)
 router.post('/upload-document', upload.single('document'), async (req, res) => {
   try {
+    const cloudinary = require('../config/cloudinary');
     const result = await cloudinary.uploader.upload(req.file.path, {
       resource_type: 'raw',
     });
@@ -79,10 +92,11 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
-// Upload PDF to Cloudinary and save in DB
-// ✅ Upload Multiple PDFs for Case
+
+// Upload Multiple PDFs for Case (still uses Cloudinary)
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
+    const cloudinary = require('../config/cloudinary');
     if (!req.file) {
       return res.status(400).json({ error: 'No document uploaded' });
     }
@@ -111,7 +125,6 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     const cloudinaryRawUrl = result.secure_url;
     const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(cloudinaryRawUrl)}`;
 
-    // ✅ Response without file_url
     res.json({
       documents: [
         {
@@ -151,5 +164,35 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 🔍 Search PDFs by content
+router.get('/search', async (req, res) => {
+  const { query } = req.query;
+
+  if (!query) return res.status(400).json({ error: 'Search query is required' });
+
+  try {
+    const result = await osClient.search({
+      index: 'pdf_documents',
+      body: {
+        query: {
+          match: {
+            content: query
+          }
+        }
+      }
+    });
+
+    const hits = result.body.hits.hits.map(hit => hit._source);
+
+    res.json({
+      message: 'Search completed successfully',
+      count: hits.length,
+      results: hits
+    });
+  } catch (err) {
+    console.error('❌ Search failed:', err);
+    res.status(500).json({ error: 'Search failed', details: err.message });
+  }
+});
 
 module.exports = router;
