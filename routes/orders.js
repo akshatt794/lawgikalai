@@ -26,7 +26,8 @@ async function parseAndIndexPDF(fileBuffer, metadata) {
   return await osClient.index({
     index: 'orders',
     id: metadata.orderId,
-    body: doc
+    body: doc,
+    refresh: true // ✅ ensure document is searchable immediately
   });
 }
 
@@ -82,7 +83,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
   }
 });
 
-// Upload Single PDF (still Cloudinary)
+// Upload Single PDF (Cloudinary)
 router.post('/upload-document', upload.single('document'), async (req, res) => {
   try {
     const cloudinary = require('../config/cloudinary');
@@ -189,10 +190,32 @@ router.get('/search', async (req, res) => {
       }
     });
 
-    res.json(response.body.hits.hits);
+    const results = response.body.hits.hits.map(hit => hit._source); // ✅ Only return document content
+    res.json(results);
   } catch (err) {
     console.error('Search error:', err.meta?.body || err);
     res.status(500).json({ error: 'Search failed', details: err.meta?.body?.error?.reason || err.message });
+  }
+});
+
+// 🐞 Temporary: Debug to see what's in the index
+router.get('/debug-index', async (req, res) => {
+  try {
+    const response = await osClient.search({
+      index: 'orders',
+      body: {
+        query: {
+          match_all: {}
+        },
+        size: 10
+      }
+    });
+
+    const results = response.body.hits.hits.map(hit => hit._source);
+    res.json(results);
+  } catch (err) {
+    console.error('Debug fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch index', details: err.message });
   }
 });
 
