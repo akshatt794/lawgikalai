@@ -171,8 +171,8 @@ router.get('/search', async (req, res) => {
   if (!query) return res.status(400).json({ error: 'Search query is required' });
 
   try {
-    const result = await osClient.search({
-      index: 'pdf_documents',
+    const response = await osClient.search({
+      index: 'orders',
       body: {
         query: {
           match: {
@@ -181,18 +181,13 @@ router.get('/search', async (req, res) => {
         }
       }
     });
-
-    const hits = result.body.hits.hits.map(hit => hit._source);
-
-    res.json({
-      message: 'Search completed successfully',
-      count: hits.length,
-      results: hits
-    });
+  
+    res.json(response.body.hits.hits);
   } catch (err) {
-    console.error('❌ Search failed:', err);
-    res.status(500).json({ error: 'Search failed', details: err.message });
+    console.error('Search error:', err.meta?.body || err);
+    res.status(500).json({ error: 'Search failed', details: err.meta?.body?.error?.reason || err.message });
   }
+  
 });
 
 module.exports = router;
