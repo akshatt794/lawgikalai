@@ -5,7 +5,7 @@ const upload = require('../middleware/multer');
 const Order = require('../models/Order');
 const pdfParse = require('pdf-parse');
 const osClient = require('../utils/osClient');
-const s3 = require('../config/s3'); // ✅ added
+const s3 = require('../config/s3');
 const path = require('path');
 
 // Helper to parse and index PDF
@@ -13,15 +13,19 @@ async function parseAndIndexPDF(fileBuffer, metadata) {
   const data = await pdfParse(fileBuffer);
 
   const doc = {
+    _id: metadata.orderId,
     title: metadata.title,
-    uploaded_by: metadata.userId,
-    uploaded_at: new Date().toISOString(),
+    file_name: metadata.fileName,
+    file_url: metadata.fileUrl,
     content: data.text,
-    file_url: metadata.fileUrl
+    createdAt: metadata.createdAt,
+    uploaded_by: metadata.userId || 'anonymous',
+    uploaded_at: new Date().toISOString()
   };
 
   return await osClient.index({
-    index: 'pdf_documents',
+    index: 'orders',
+    id: metadata.orderId,
     body: doc
   });
 }
@@ -35,7 +39,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       return res.status(400).json({ error: 'No PDF uploaded' });
     }
 
-    // S3 Upload
+    // Upload to S3
     const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
     const s3Upload = await s3.upload({
       Bucket: process.env.S3_BUCKET_NAME,
@@ -48,7 +52,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     const fileUrl = s3Upload.Location;
     const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
 
-    // Save in DB
+    // Save in MongoDB
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
@@ -57,11 +61,14 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // Index content to OpenSearch
+    // Index into OpenSearch
     await parseAndIndexPDF(req.file.buffer, {
-      title: newOrder.title,
+      orderId: savedOrder._id.toString(),
+      title: savedOrder.title,
+      fileName: savedOrder.file_name,
       fileUrl: fileUrl,
-      userId: req.user?.id || 'anonymous'
+      createdAt: savedOrder.createdAt,
+      userId: req.user?.id
     });
 
     res.json({
@@ -75,7 +82,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
   }
 });
 
-// Upload PDF route (still uses Cloudinary)
+// Upload Single PDF (still Cloudinary)
 router.post('/upload-document', upload.single('document'), async (req, res) => {
   try {
     const cloudinary = require('../config/cloudinary');
@@ -93,7 +100,7 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
   }
 });
 
-// Upload Multiple PDFs for Case (still uses Cloudinary)
+// Upload Multiple PDFs (Cloudinary)
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
     const cloudinary = require('../config/cloudinary');
@@ -148,7 +155,7 @@ router.get('/', async (req, res) => {
 
     const query = {};
     if (title) {
-      query.title = { $regex: new RegExp(title, 'i') }; // case-insensitive partial match
+      query.title = { $regex: new RegExp(title, 'i') };
     }
 
     const orders = await Order.find(query).sort({ createdAt: -1 });
@@ -181,13 +188,12 @@ router.get('/search', async (req, res) => {
         }
       }
     });
-  
+
     res.json(response.body.hits.hits);
   } catch (err) {
     console.error('Search error:', err.meta?.body || err);
     res.status(500).json({ error: 'Search failed', details: err.meta?.body?.error?.reason || err.message });
   }
-  
 });
 
 module.exports = router;
