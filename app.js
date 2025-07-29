@@ -17,6 +17,7 @@ const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
 const courtRoutes = require('./routes/courts');
 const notificationRoutes = require('./routes/notifications');
+const MONGODB_URI = process.env.MONGODB_URI;
 
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
@@ -82,9 +83,7 @@ app.get('/', (req, res) => {
 });
 
 // 6. MongoDB Connect
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true
-})
+mongoose.connect(process.env.MONGODB_URI)
 
 .then(() => console.log('MongoDB connected'))
 .catch((err) => console.error('MongoDB connection error:', err));
