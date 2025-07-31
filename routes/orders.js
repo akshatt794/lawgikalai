@@ -104,7 +104,6 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
 });
 
 // ✅ Configure S3
-const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
