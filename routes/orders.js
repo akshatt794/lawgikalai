@@ -5,7 +5,6 @@ const upload = require('../middleware/multer');
 const Order = require('../models/Order');
 const pdfParse = require('pdf-parse');
 const osClient = require('../utils/osClient');
-const s3 = require('../config/s3');
 const path = require('path');
 
 // Helper to parse and index PDF
