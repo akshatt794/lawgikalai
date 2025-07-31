@@ -8,7 +8,16 @@ const osClient = require('../utils/osClient');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
-const s3 = require('../config/s3'); // ✅ your s3.js file path
+const { PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const uploadParams = {
+  Bucket: process.env.AWS_BUCKET_NAME,
+  Key: fileKey, // e.g., `${Date.now()}_${req.file.originalname}`
+  Body: req.file.buffer,
+  ContentType: req.file.mimetype,
+};
+
+const result = await s3.send(new PutObjectCommand(uploadParams));
 const PdfDocument = require('../models/PdfDocument');
 
 // Helper to parse and index PDF
