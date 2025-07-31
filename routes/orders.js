@@ -208,7 +208,7 @@ router.get('/search', async (req, res) => {
       }
     });
 
-    const hits = result.hits.hits.map(hit => {
+    const hits = result.body.hits.hits.map(hit => {
       const content = hit._source.content || '';
       const regex = new RegExp(query, 'gi');
       const occurrences = (content.match(regex) || []).length;
