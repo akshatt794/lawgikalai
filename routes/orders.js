@@ -8,6 +8,8 @@ const osClient = require('../utils/osClient');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
+const s3 = require('../config/s3'); // ✅ your s3.js file path
+const { PutObjectCommand } = require('@aws-sdk/client-s3');
 
 // Helper to parse and index PDF
 async function parseAndIndexPDF(fileBuffer, metadata) {
@@ -103,6 +105,7 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
 });
 
 // ✅ Configure S3
+const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
