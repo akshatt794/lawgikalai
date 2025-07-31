@@ -9,7 +9,6 @@ const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 const s3 = require('../config/s3'); // ✅ your s3.js file path
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
 
 // Helper to parse and index PDF
 async function parseAndIndexPDF(fileBuffer, metadata) {
