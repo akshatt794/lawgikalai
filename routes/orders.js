@@ -254,9 +254,6 @@ router.get('/debug-index', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch index', details: err.message });
   }
 });
-app.listen(3000, '0.0.0.0', () => {
-  console.log('✅ Server running on port 3000');
-});
 
 
 module.exports = router;
