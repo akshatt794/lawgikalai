@@ -184,23 +184,25 @@ router.get('/search', async (req, res) => {
     const result = await osClient.search({
       index: 'pdf_documents',
       size: 50,
-      query: {
-        match: {
-          content: {
-            query: query,
-            operator: "and"
-          }
-        }
-      },
-      highlight: {
-        fields: {
-          content: {
-            fragment_size: 150,
-            number_of_fragments: 1
+      body: {  // ✅ Wrap query + highlight inside body
+        query: {
+          match: {
+            content: {
+              query: query,
+              operator: "and"
+            }
           }
         },
-        pre_tags: ['<mark>'],
-        post_tags: ['</mark>']
+        highlight: {
+          fields: {
+            content: {
+              fragment_size: 150,
+              number_of_fragments: 1
+            }
+          },
+          pre_tags: ['<mark>'],
+          post_tags: ['</mark>']
+        }
       }
     });
 
@@ -224,7 +226,7 @@ router.get('/search', async (req, res) => {
       };
     });
 
-    // Sort manually by how many times word appears
+    // Sort manually by number of keyword hits
     hits.sort((a, b) => b.occurrences - a.occurrences);
 
     res.json(hits);
@@ -233,6 +235,7 @@ router.get('/search', async (req, res) => {
     res.status(500).json({ error: 'Search failed' });
   }
 });
+
 
 // 🐞 Temporary: Debug to see what's in the index
 router.get('/debug-index', async (req, res) => {
