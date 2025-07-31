@@ -172,29 +172,65 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 🔍 Search PDFs by content
+// 🔍 Enhanced PDF search with snippet
 router.get('/search', async (req, res) => {
   const { query } = req.query;
 
-  if (!query) return res.status(400).json({ error: 'Search query is required' });
+  if (!query) {
+    return res.status(400).json({ error: 'Missing search query' });
+  }
 
   try {
-    const response = await osClient.search({
-      index: 'orders',
-      body: {
-        query: {
-          match: {
-            content: query
+    const result = await osClient.search({
+      index: 'pdf_documents',
+      size: 50,
+      query: {
+        match: {
+          content: {
+            query: query,
+            operator: "and"
           }
         }
+      },
+      highlight: {
+        fields: {
+          content: {
+            fragment_size: 150,
+            number_of_fragments: 1
+          }
+        },
+        pre_tags: ['<mark>'],
+        post_tags: ['</mark>']
       }
     });
 
-    const results = response.body.hits.hits.map(hit => hit._source); // ✅ Only return document content
-    res.json(results);
-  } catch (err) {
-    console.error('Search error:', err.meta?.body || err);
-    res.status(500).json({ error: 'Search failed', details: err.meta?.body?.error?.reason || err.message });
+    const hits = result.hits.hits.map(hit => {
+      const content = hit._source.content || '';
+      const regex = new RegExp(query, 'gi');
+      const occurrences = (content.match(regex) || []).length;
+
+      const snippet =
+        hit.highlight && hit.highlight.content
+          ? hit.highlight.content[0]
+          : content.split('. ').find(line => line.toLowerCase().includes(query.toLowerCase())) || '';
+
+      return {
+        id: hit._id,
+        title: hit._source.title,
+        file_url: hit._source.file_url,
+        uploaded_at: hit._source.uploaded_at,
+        occurrences,
+        snippet
+      };
+    });
+
+    // Sort manually by how many times word appears
+    hits.sort((a, b) => b.occurrences - a.occurrences);
+
+    res.json(hits);
+  } catch (error) {
+    console.error('❌ Search error:', error);
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 

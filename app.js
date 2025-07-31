@@ -90,16 +90,14 @@ app.get('/', (req, res) => {
 const uri = process.env.DOCUMENTDB_URI;
 
 mongoose.connect(process.env.DOCUMENTDB_URI, {
-  tls: true,
-  tlsCAFile: path.resolve(__dirname, './global-bundle.pem'),
-  replicaSet: 'rs0',
-  readPreference: 'secondaryPreferred',
-  retryWrites: false
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 })
-.then(() => {
-  console.log('✅ Connected to DocumentDB');
-})
-.catch((err) => {
-  console.error('❌ DocumentDB connection error:', err);
-});
+  .then(() => {
+    console.log('✅ Connected to DocumentDB');
+  })
+  .catch((err) => {
+    console.error('❌ DocumentDB connection error:', err);
+  });
+
 
