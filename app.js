@@ -1,5 +1,6 @@
 require('dotenv').config();
 require('dotenv').config({ path: '.env.firebase' });
+const fs = require('fs');
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -19,7 +20,6 @@ const courtRoutes = require('./routes/courts');
 const notificationRoutes = require('./routes/notifications');
 const path = require('path');
 const testDocumentDbRoute = require('./routes/test-documentdb');
-const fs = require('fs');
 
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
@@ -90,14 +90,13 @@ app.get('/', (req, res) => {
 const uri = process.env.DOCUMENTDB_URI;
 
 mongoose.connect(process.env.DOCUMENTDB_URI, {
+  ssl: true,
+  sslCA: fs.readFileSync(path.resolve(__dirname, 'global-bundle.pem')),
+  replicaSet: 'rs0',
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => {
-    console.log('✅ Connected to DocumentDB');
-  })
-  .catch((err) => {
-    console.error('❌ DocumentDB connection error:', err);
-  });
+.then(() => console.log('✅ Connected to DocumentDB'))
+.catch(err => console.error('❌ DocumentDB connection error:', err));
 
 
