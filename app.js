@@ -99,4 +99,3 @@ mongoose.connect(process.env.DOCUMENTDB_URI, {
 .then(() => console.log('✅ Connected to DocumentDB'))
 .catch(err => console.error('❌ DocumentDB connection error:', err));
 
-
