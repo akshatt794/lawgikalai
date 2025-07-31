@@ -7,6 +7,7 @@ const pdfParse = require('pdf-parse');
 const osClient = require('../utils/osClient');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const crypto = require('crypto');
 
 // Helper to parse and index PDF
 async function parseAndIndexPDF(fileBuffer, metadata) {
