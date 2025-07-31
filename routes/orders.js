@@ -249,10 +249,13 @@ router.get('/debug-index', async (req, res) => {
 
     const results = response.body.hits.hits.map(hit => hit._source);
     res.json(results);
-  } catch (err) {
-    console.error('Debug fetch error:', err);
-    res.status(500).json({ error: 'Failed to fetch index', details: err.message });
-  }
+  
+
+} catch (error) {
+  console.error('❌ OpenSearch error:', error); // ← add this line
+  res.status(500).json({ error: 'Search failed' });
+}
+
 });
 
 
