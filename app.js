@@ -89,13 +89,12 @@ app.get('/', (req, res) => {
 // 6. MongoDB Connect
 const uri = process.env.DOCUMENTDB_URI;
 
-mongoose.connect(process.env.DOCUMENTDB_URI, {
+mongoose.connect(uri, {
   ssl: true,
-  sslCA: fs.readFileSync(path.resolve(__dirname, 'global-bundle.pem')),
+  tlsCAFile: path.resolve(__dirname, 'global-bundle.pem'), // ✅ ✅ ✅ Correct field name
   replicaSet: 'rs0',
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
 .then(() => console.log('✅ Connected to DocumentDB'))
 .catch(err => console.error('❌ DocumentDB connection error:', err));
-
