@@ -98,3 +98,6 @@ mongoose.connect(uri, {
 })
 .then(() => console.log('✅ Connected to DocumentDB'))
 .catch(err => console.error('❌ DocumentDB connection error:', err));
+app.listen(3000, '0.0.0.0', () => {
+  console.log('✅ Server running on port 3000');
+});
