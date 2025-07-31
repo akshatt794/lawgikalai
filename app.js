@@ -17,7 +17,9 @@ const announcementRoutes = require('./routes/announcements');
 const subscriptionRoutes = require('./routes/subscription');
 const courtRoutes = require('./routes/courts');
 const notificationRoutes = require('./routes/notifications');
-const MONGODB_URI = process.env.MONGODB_URI;
+const path = require('path');
+const testDocumentDbRoute = require('./routes/test-documentdb');
+const fs = require('fs');
 
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
@@ -76,6 +78,8 @@ app.use('/api/ai', require('./routes/aiDrafting'));
 app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', ordersRoutes);
+app.use('/api/test', testDocumentDbRoute);
+
 app.use(express.json());
 // 5. Base route
 app.get('/', (req, res) => {
@@ -83,18 +87,19 @@ app.get('/', (req, res) => {
 });
 
 // 6. MongoDB Connect
-mongoose.connect(process.env.MONGODB_URI)
+const uri = process.env.DOCUMENTDB_URI;
 
-.then(() => console.log('MongoDB connected'))
-.catch((err) => console.error('MongoDB connection error:', err));
-
-// 7. Top-level error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Something broke!', details: err.message });
+mongoose.connect(process.env.DOCUMENTDB_URI, {
+  tls: true,
+  tlsCAFile: path.resolve(__dirname, './global-bundle.pem'),
+  replicaSet: 'rs0',
+  readPreference: 'secondaryPreferred',
+  retryWrites: false
+})
+.then(() => {
+  console.log('✅ Connected to DocumentDB');
+})
+.catch((err) => {
+  console.error('❌ DocumentDB connection error:', err);
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(3001, '0.0.0.0', () => {
-  console.log('Server running on 0.0.0.0:3000');
-});
