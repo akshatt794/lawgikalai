@@ -101,46 +101,45 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
   }
 });
 
-// Upload Multiple PDFs (Cloudinary)
+// ✅ Configure S3
+const s3 = new S3Client({ region: process.env.AWS_REGION });
+
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
-    const cloudinary = require('../config/cloudinary');
-    if (!req.file) {
-      return res.status(400).json({ error: 'No document uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
 
-    const bufferStream = Readable.from(req.file.buffer);
+    // 🧠 Parse PDF content
+    const parsed = await pdfParse(req.file.buffer);
 
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'lawgikalai-documents',
-          resource_type: 'raw',
-          public_id: req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_'),
-          use_filename: true,
-          unique_filename: false
-        },
-        (err, uploadResult) => {
-          if (err) return reject(err);
-          resolve(uploadResult);
-        }
-      );
+    // 🔐 Generate unique key
+    const key = `documents/${crypto.randomUUID()}_${req.file.originalname.replace(/\s+/g, '_')}`;
 
-      bufferStream.pipe(stream);
+    // ⬆️ Upload to S3
+    const uploadParams = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: 'application/pdf'
+    };
+    await s3.send(new PutObjectCommand(uploadParams));
+
+    const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+
+    // 🗃 Save metadata to DocumentDB
+    const doc = new PdfDocument({
+      title: req.file.originalname,
+      file_url: fileUrl,
+      content: parsed.text
     });
-
-    const fileName = req.file.originalname;
-    const cloudinaryRawUrl = result.secure_url;
-    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(cloudinaryRawUrl)}`;
+    await doc.save();
 
     res.json({
-      documents: [
-        {
-          file_name: fileName,
-          embed_url: embedUrl
-        }
-      ],
-      message: 'Document uploaded successfully!'
+      message: 'PDF uploaded and indexed successfully!',
+      document: {
+        title: doc.title,
+        file_url: doc.file_url,
+        uploaded_at: doc.uploaded_at
+      }
     });
 
   } catch (err) {
@@ -148,6 +147,7 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
+
 
 // ✅ Get Orders by optional title
 router.get('/', async (req, res) => {
