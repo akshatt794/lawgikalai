@@ -199,7 +199,10 @@ router.get('/search', async (req, res) => {
     });
 
     hits.sort((a, b) => b.occurrences - a.occurrences);
-    res.json(hits);
+    res.json({
+      message: 'Search fetched successfully',
+      results: hits
+    });
 
   } catch (error) {
     console.error('❌ Search error:', error);

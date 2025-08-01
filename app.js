@@ -20,6 +20,7 @@ const courtRoutes = require('./routes/courts');
 const notificationRoutes = require('./routes/notifications');
 const path = require('path');
 const testDocumentDbRoute = require('./routes/test-documentdb');
+const crypto = require('crypto');
 
 const servePath = process.env.NODE_ENV === 'production' ? '/tmp' : 'uploads';
 
