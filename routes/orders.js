@@ -8,15 +8,13 @@ const osClient = require('../utils/osClient');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
-
 const PdfDocument = require('../models/PdfDocument');
 
-// Helper to parse and index PDF
+// ✅ OpenSearch PDF Indexing Helper
 async function parseAndIndexPDF(fileBuffer, metadata) {
   const data = await pdfParse(fileBuffer);
 
   const doc = {
-    _id: metadata.orderId,
     title: metadata.title,
     file_name: metadata.fileName,
     file_url: metadata.fileUrl,
@@ -34,7 +32,7 @@ async function parseAndIndexPDF(fileBuffer, metadata) {
   });
 }
 
-// ✅ Upload PDF Order (uses S3 now)
+// ✅ Upload PDF Order (uses S3)
 router.post('/upload', upload.single('order'), async (req, res) => {
   try {
     console.log("➡️ Upload route hit");
@@ -45,17 +43,9 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 
     const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
 
-const uploadParams = {
-  Bucket: process.env.S3_BUCKET_NAME,
-  Key: s3Key,
-  Body: req.file.buffer,
-  ContentType: req.file.mimetype,
-};
+    await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
 
-await s3.send(new PutObjectCommand(uploadParams));
-
-const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
-
+    const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
     const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
 
     const newOrder = new Order({
@@ -86,7 +76,7 @@ const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGI
   }
 });
 
-// Upload Single PDF (Cloudinary)
+// ✅ Upload Single PDF (Cloudinary)
 router.post('/upload-document', upload.single('document'), async (req, res) => {
   try {
     const cloudinary = require('../config/cloudinary');
@@ -104,13 +94,12 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
   }
 });
 
-// ✅ Configure S3
+// ✅ Upload PDF (S3) & Index Content
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
 
     const parsed = await pdfParse(req.file.buffer);
-
     const key = `documents/${crypto.randomUUID()}_${req.file.originalname.replace(/\s+/g, '_')}`;
 
     await uploadToS3(req.file.buffer, key, 'application/pdf');
@@ -143,12 +132,7 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { title } = req.query;
-
-    const query = {};
-    if (title) {
-      query.title = { $regex: new RegExp(title, 'i') };
-    }
-
+    const query = title ? { title: { $regex: new RegExp(title, 'i') } } : {};
     const orders = await Order.find(query).sort({ createdAt: -1 });
 
     res.json({
@@ -166,9 +150,7 @@ router.get('/', async (req, res) => {
 router.get('/search', async (req, res) => {
   const { query } = req.query;
 
-  if (!query) {
-    return res.status(400).json({ error: 'Missing search query' });
-  }
+  if (!query) return res.status(400).json({ error: 'Missing search query' });
 
   try {
     const result = await osClient.search({
@@ -202,9 +184,9 @@ router.get('/search', async (req, res) => {
       const occurrences = (content.match(regex) || []).length;
 
       const snippet =
-        hit.highlight && hit.highlight.content
-          ? hit.highlight.content[0]
-          : content.split('. ').find(line => line.toLowerCase().includes(query.toLowerCase())) || '';
+        hit.highlight?.content?.[0] ||
+        content.split('. ').find(line => line.toLowerCase().includes(query.toLowerCase())) ||
+        '';
 
       return {
         id: hit._id,
@@ -217,36 +199,35 @@ router.get('/search', async (req, res) => {
     });
 
     hits.sort((a, b) => b.occurrences - a.occurrences);
-
     res.json(hits);
+
   } catch (error) {
     console.error('❌ Search error:', error);
     res.status(500).json({ error: 'Search failed' });
   }
 });
 
-// 🐞 Temporary: Debug to see what's in the index
+// 🐞 Debug: View indexed OpenSearch documents
 router.get('/debug-index', async (req, res) => {
   try {
     const response = await osClient.search({
       index: 'orders',
       body: {
-        query: {
-          match_all: {}
-        },
+        query: { match_all: {} },
         size: 10
       }
     });
 
     const results = response.body.hits.hits.map(hit => hit._source);
     res.json(results);
+
   } catch (error) {
     console.error('❌ OpenSearch error:', error);
     res.status(500).json({ error: 'Search failed' });
   }
 });
 
-// ✅ Utility: Upload to S3 (wrapped for safe usage)
+// ✅ Utility: Upload to S3 (wrapped for reuse)
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 async function uploadToS3(buffer, key, contentType) {
@@ -254,11 +235,11 @@ async function uploadToS3(buffer, key, contentType) {
     Bucket: process.env.S3_BUCKET_NAME,
     Key: key,
     Body: buffer,
-    ContentType: contentType,
-    ACL: 'public-read'
+    ContentType: contentType
   };
 
   return await s3.send(new PutObjectCommand(params));
 }
 
 module.exports = router;
+
