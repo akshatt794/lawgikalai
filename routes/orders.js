@@ -44,15 +44,19 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     }
 
     const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
-    const s3Upload = await s3.upload({
-      Bucket: process.env.S3_BUCKET_NAME,
-      Key: s3Key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-      ACL: 'public-read'
-    }).promise();
 
-    const fileUrl = s3Upload.Location;
+const uploadParams = {
+  Bucket: process.env.S3_BUCKET_NAME,
+  Key: s3Key,
+  Body: req.file.buffer,
+  ContentType: req.file.mimetype,
+  ACL: 'public-read'
+};
+
+await s3.send(new PutObjectCommand(uploadParams));
+
+const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+
     const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
 
     const newOrder = new Order({
