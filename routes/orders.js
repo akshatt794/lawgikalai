@@ -154,7 +154,7 @@ router.get('/search', async (req, res) => {
 
   try {
     const result = await osClient.search({
-      index: 'pdf_documents',
+      index: 'orders',
       size: 50,
       body: {
         query: {
