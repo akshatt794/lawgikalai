@@ -50,7 +50,6 @@ const uploadParams = {
   Key: s3Key,
   Body: req.file.buffer,
   ContentType: req.file.mimetype,
-  ACL: 'public-read'
 };
 
 await s3.send(new PutObjectCommand(uploadParams));
