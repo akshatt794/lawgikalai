@@ -148,21 +148,41 @@ router.get('/', async (req, res) => {
 
 // 🔍 Enhanced PDF search with snippet
 router.get('/search', async (req, res) => {
-  const { query } = req.query;
+  const { query, page = 1, limit = 10 } = req.query;
 
   if (!query) return res.status(400).json({ error: 'Missing search query' });
+
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  const from = (pageNum - 1) * limitNum;
 
   try {
     const result = await osClient.search({
       index: 'orders',
-      size: 50,
+      from,
+      size: limitNum,
       body: {
         query: {
-          match: {
-            content: {
-              query: query,
-              operator: "and"
-            }
+          bool: {
+            should: [
+              {
+                match: {
+                  content: {
+                    query: query,
+                    operator: "and",
+                    fuzziness: "AUTO"
+                  }
+                }
+              },
+              {
+                wildcard: {
+                  content: {
+                    value: `*${query.toLowerCase()}*`,
+                    case_insensitive: true
+                  }
+                }
+              }
+            ]
           }
         },
         highlight: {
@@ -185,8 +205,9 @@ router.get('/search', async (req, res) => {
 
       const snippet =
         hit.highlight?.content?.[0] ||
-        content.split('. ').find(line => line.toLowerCase().includes(query.toLowerCase())) ||
-        '';
+        content
+          .split('. ')
+          .find(line => line.toLowerCase().includes(query.toLowerCase())) || '';
 
       return {
         id: hit._id,
@@ -199,8 +220,11 @@ router.get('/search', async (req, res) => {
     });
 
     hits.sort((a, b) => b.occurrences - a.occurrences);
+
     res.json({
       message: 'Search fetched successfully',
+      page: pageNum,
+      limit: limitNum,
       results: hits
     });
 
