@@ -9,14 +9,6 @@ const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 
-const uploadParams = {
-  Bucket: process.env.AWS_BUCKET_NAME,
-  Key: fileKey, // e.g., `${Date.now()}_${req.file.originalname}`
-  Body: req.file.buffer,
-  ContentType: req.file.mimetype,
-};
-
-const result = await s3.send(new PutObjectCommand(uploadParams));
 const PdfDocument = require('../models/PdfDocument');
 
 // Helper to parse and index PDF
@@ -38,7 +30,7 @@ async function parseAndIndexPDF(fileBuffer, metadata) {
     index: 'orders',
     id: metadata.orderId,
     body: doc,
-    refresh: true // ✅ ensure document is searchable immediately
+    refresh: true
   });
 }
 
@@ -51,7 +43,6 @@ router.post('/upload', upload.single('order'), async (req, res) => {
       return res.status(400).json({ error: 'No PDF uploaded' });
     }
 
-    // Upload to S3
     const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
     const s3Upload = await s3.upload({
       Bucket: process.env.S3_BUCKET_NAME,
@@ -64,7 +55,6 @@ router.post('/upload', upload.single('order'), async (req, res) => {
     const fileUrl = s3Upload.Location;
     const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
 
-    // Save in MongoDB
     const newOrder = new Order({
       title: req.body.title || 'Untitled',
       file_name: req.file.originalname,
@@ -73,7 +63,6 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // Index into OpenSearch
     await parseAndIndexPDF(req.file.buffer, {
       orderId: savedOrder._id.toString(),
       title: savedOrder.title,
@@ -113,29 +102,18 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
 });
 
 // ✅ Configure S3
-
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
 
-    // 🧠 Parse PDF content
     const parsed = await pdfParse(req.file.buffer);
 
-    // 🔐 Generate unique key
     const key = `documents/${crypto.randomUUID()}_${req.file.originalname.replace(/\s+/g, '_')}`;
 
-    // ⬆️ Upload to S3
-    const uploadParams = {
-      Bucket: process.env.S3_BUCKET_NAME,
-      Key: key,
-      Body: req.file.buffer,
-      ContentType: 'application/pdf'
-    };
-    await s3.send(new PutObjectCommand(uploadParams));
+    await uploadToS3(req.file.buffer, key, 'application/pdf');
 
     const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
-    // 🗃 Save metadata to DocumentDB
     const doc = new PdfDocument({
       title: req.file.originalname,
       file_url: fileUrl,
@@ -157,7 +135,6 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
-
 
 // ✅ Get Orders by optional title
 router.get('/', async (req, res) => {
@@ -194,7 +171,7 @@ router.get('/search', async (req, res) => {
     const result = await osClient.search({
       index: 'pdf_documents',
       size: 50,
-      body: {  // ✅ Wrap query + highlight inside body
+      body: {
         query: {
           match: {
             content: {
@@ -236,7 +213,6 @@ router.get('/search', async (req, res) => {
       };
     });
 
-    // Sort manually by number of keyword hits
     hits.sort((a, b) => b.occurrences - a.occurrences);
 
     res.json(hits);
@@ -245,7 +221,6 @@ router.get('/search', async (req, res) => {
     res.status(500).json({ error: 'Search failed' });
   }
 });
-
 
 // 🐞 Temporary: Debug to see what's in the index
 router.get('/debug-index', async (req, res) => {
@@ -262,14 +237,25 @@ router.get('/debug-index', async (req, res) => {
 
     const results = response.body.hits.hits.map(hit => hit._source);
     res.json(results);
-  
-
-} catch (error) {
-  console.error('❌ OpenSearch error:', error); // ← add this line
-  res.status(500).json({ error: 'Search failed' });
-}
-
+  } catch (error) {
+    console.error('❌ OpenSearch error:', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
 });
 
+// ✅ Utility: Upload to S3 (wrapped for safe usage)
+const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+async function uploadToS3(buffer, key, contentType) {
+  const params = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+    ACL: 'public-read'
+  };
+
+  return await s3.send(new PutObjectCommand(params));
+}
 
 module.exports = router;
