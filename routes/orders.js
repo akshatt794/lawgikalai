@@ -8,7 +8,6 @@ const osClient = require('../utils/osClient');
 const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const uploadParams = {
   Bucket: process.env.AWS_BUCKET_NAME,
