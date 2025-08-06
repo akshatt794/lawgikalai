@@ -221,12 +221,17 @@ router.get('/search', async (req, res) => {
 
     hits.sort((a, b) => b.occurrences - a.occurrences);
 
-    res.json({
-      message: 'Search fetched successfully',
-      page: pageNum,
-      limit: limitNum,
-      results: hits
-    });
+    res.json(
+      Object.assign(
+        { message: 'Search fetched successfully' },
+        {
+          page: pageNum,
+          limit: limitNum,
+          results: hits
+        }
+      )
+    );
+    
 
   } catch (error) {
     console.error('❌ Search error:', error);
