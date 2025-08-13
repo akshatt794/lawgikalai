@@ -148,58 +148,114 @@ router.get('/', async (req, res) => {
 
 // 🔍 Enhanced PDF search with snippet
 router.get('/search', async (req, res) => {
-  const { query, page = 1, limit = 10 } = req.query;
+  const { query, page = 1, limit = 10, relevance = 'true' } = req.query;
 
   if (!query) return res.status(400).json({ error: 'Missing search query' });
 
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
   const from = (pageNum - 1) * limitNum;
+  const relevanceBool = String(relevance).toLowerCase() !== 'false'; // true unless explicitly "false"
+
+  // Base content query (case-insensitive + fuzzy)
+  const contentQuery = {
+    bool: {
+      should: [
+        {
+          match: {
+            content: {
+              query: query,
+              operator: 'and',
+              fuzziness: 'AUTO'
+            }
+          }
+        },
+        {
+          wildcard: {
+            content: {
+              value: `*${String(query).toLowerCase()}*`,
+              case_insensitive: true
+            }
+          }
+        }
+      ],
+      minimum_should_match: 1
+    }
+  };
+
+  // If relevance=false, boost by proximity to "now" using a gaussian decay on the date field.
+  // Tune `scale` to how quickly the date influence should fall off (e.g., "30d" → ~month window).
+  const queryWithDateBoost = {
+    function_score: {
+      query: contentQuery,
+      boost_mode: 'multiply',
+      score_mode: 'multiply',
+      functions: [
+        {
+          gauss: {
+            uploaded_at: {
+              origin: 'now',
+              scale: '30d',
+              offset: '0d',
+              decay: 0.5
+            }
+          }
+        }
+      ]
+    }
+  };
+
+  // For an unmistakable “closest to now” ordering when relevance=false,
+  // we also add a secondary sort using a script that measures absolute time distance from now.
+  const dateProximitySort = [
+    { _score: 'desc' },
+    {
+      _script: {
+        type: 'number',
+        order: 'asc',
+        script: {
+          source: "Math.abs(doc['uploaded_at'].value.millis - params.now)",
+          params: { now: Date.now() }
+        }
+      }
+    }
+  ];
 
   try {
+    const body = {
+      // If relevance=true → plain content query; else → content + date boost
+      query: relevanceBool ? contentQuery : queryWithDateBoost,
+      highlight: {
+        fields: {
+          content: {
+            fragment_size: 150,
+            number_of_fragments: 1
+          }
+        },
+        pre_tags: ['<mark>'],
+        post_tags: ['</mark>']
+      }
+    };
+
+    if (!relevanceBool) {
+      body.sort = dateProximitySort;
+    }
+
     const result = await osClient.search({
       index: 'orders',
       from,
       size: limitNum,
-      body: {
-        query: {
-          bool: {
-            should: [
-              {
-                match: {
-                  content: {
-                    query: query,
-                    operator: "and",
-                    fuzziness: "AUTO"
-                  }
-                }
-              },
-              {
-                wildcard: {
-                  content: {
-                    value: `*${query.toLowerCase()}*`,
-                    case_insensitive: true
-                  }
-                }
-              }
-            ]
-          }
-        },
-        highlight: {
-          fields: {
-            content: {
-              fragment_size: 150,
-              number_of_fragments: 1
-            }
-          },
-          pre_tags: ['<mark>'],
-          post_tags: ['</mark>']
-        }
-      }
+      body
     });
 
-    const hits = result.body.hits.hits.map(hit => {
-      const content = hit._source.content || '';
+    const total =
+      (result.body?.hits?.total?.value ?? result.hits?.total?.value) ?? 0;
+
+    const hitsRaw = result.body?.hits?.hits || result.hits?.hits || [];
+
+    const hits = hitsRaw.map(hit => {
+      const src = hit._source || {};
+      const content = src.content || '';
       const regex = new RegExp(query, 'gi');
       const occurrences = (content.match(regex) || []).length;
 
@@ -207,37 +263,39 @@ router.get('/search', async (req, res) => {
         hit.highlight?.content?.[0] ||
         content
           .split('. ')
-          .find(line => line.toLowerCase().includes(query.toLowerCase())) || '';
+          .find(line => line.toLowerCase().includes(String(query).toLowerCase())) ||
+        '';
 
       return {
         id: hit._id,
-        title: hit._source.title,
-        file_url: hit._source.file_url,
-        uploaded_at: hit._source.uploaded_at,
+        title: src.title,
+        file_url: src.file_url,
+        uploaded_at: src.uploaded_at,
         occurrences,
-        snippet
+        snippet,
+        _score: hit._score
       };
     });
 
-    hits.sort((a, b) => b.occurrences - a.occurrences);
+    // Keep your frequency tie‑breaker when relevance=true (content‑first).
+    if (relevanceBool) {
+      hits.sort((a, b) => b.occurrences - a.occurrences);
+    }
+    // When relevance=false, ordering already comes from ES/OpenSearch (score + date proximity).
 
-    res.json(
-      Object.assign(
-        { message: 'Search fetched successfully' },
-        {
-          page: pageNum,
-          limit: limitNum,
-          results: hits
-        }
-      )
-    );
-    
-
+    res.json({
+      message: 'Search fetched successfully',
+      page: pageNum,
+      limit: limitNum,
+      total,
+      results: hits
+    });
   } catch (error) {
     console.error('❌ Search error:', error);
     res.status(500).json({ error: 'Search failed' });
   }
 });
+
 
 // 🐞 Debug: View indexed OpenSearch documents
 router.get('/debug-index', async (req, res) => {
