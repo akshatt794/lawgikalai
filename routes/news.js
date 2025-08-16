@@ -11,9 +11,11 @@ const cloudinary = require('../config/cloudinary');
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
+// keep /tmp on prod for ephemeral FS
 const UPLOAD_DIR = process.env.NODE_ENV === 'production' ? '/tmp/uploads/news' : 'uploads/news';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// ---- Multer: disk storage + allow images & PDFs ----
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, UPLOAD_DIR);
@@ -22,8 +24,28 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage });
 
+const fileFilter = (req, file, cb) => {
+  const allowed = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'application/pdf'
+  ];
+  if (!allowed.includes(file.mimetype)) {
+    return cb(new Error('Only images (jpg/png/webp/gif) or PDF allowed'));
+  }
+  cb(null, true);
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25 MB
+});
+
+// ---- Auth helpers ----
 function auth(req, res, next) {
   const header = req.headers.authorization;
   if (!header) return res.status(401).json({ error: 'Missing token' });
@@ -47,37 +69,77 @@ function getUserIdFromToken(req) {
   }
 }
 
+// ---- Upload news (supports image or PDF in field "image") ----
 router.post('/upload', upload.single('image'), async (req, res) => {
+  let localPath;
   try {
     const {
       title, content, category, date, source, summary, fullUpdate,
       sc_said, announced_by, applies_to, legal_impact, legal_sections, createdAt
     } = req.body;
 
+    // optional: basic validation
+    if (!title) return res.status(400).json({ error: 'title is required' });
+
     let imageUrl = null;
+
     if (req.file) {
-      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'news'
+      localPath = req.file.path;
+
+      // IMPORTANT: resource_type:'auto' to allow PDFs
+      const uploadResult = await cloudinary.uploader.upload(localPath, {
+        folder: 'news',
+        resource_type: 'auto',                 // <--- fixes PDF 500
+        use_filename: true,
+        unique_filename: false
       });
       imageUrl = uploadResult.secure_url;
-      fs.unlinkSync(req.file.path);
+    }
+
+    // Parse legal_sections safely
+    let legalSectionsParsed = [];
+    if (Array.isArray(legal_sections)) {
+      legalSectionsParsed = legal_sections;
+    } else if (typeof legal_sections === 'string' && legal_sections.trim()) {
+      try {
+        legalSectionsParsed = JSON.parse(legal_sections);
+      } catch {
+        // tolerate bad JSON; keep empty array
+        legalSectionsParsed = [];
+      }
     }
 
     const news = new News({
-      title, content, category, date, source, summary, fullUpdate,
-      sc_said, announced_by, applies_to, legal_impact,
-      legal_sections: JSON.parse(legal_sections || '[]'),
-      image: imageUrl, createdAt
+      title,
+      content,
+      category,
+      date,            // keep as-is if your schema is String/Date; otherwise cast
+      source,
+      summary,
+      fullUpdate,
+      sc_said,
+      announced_by,
+      applies_to,
+      legal_impact,
+      legal_sections: legalSectionsParsed,
+      image: imageUrl,
+      createdAt: createdAt ? new Date(createdAt) : undefined
     });
 
     await news.save();
-    res.json({ message: 'News uploaded with extended fields!', news });
+    return res.status(201).json({ message: 'News uploaded with extended fields!', news });
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed', details: err.message });
+    return res.status(500).json({ error: 'Upload failed', details: err.message });
+  } finally {
+    // clean up temp file if present
+    if (localPath) {
+      fs.promises.unlink(localPath).catch(() => {});
+    }
   }
 });
 
+// ---- Related by category ----
 router.get('/related/:category', async (req, res) => {
   try {
     const { category } = req.params;
@@ -89,6 +151,7 @@ router.get('/related/:category', async (req, res) => {
   }
 });
 
+// ---- All (with saved flags) ----
 router.get('/all', async (req, res) => {
   try {
     const news = await News.find().sort({ createdAt: -1 });
@@ -112,6 +175,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
+// ---- Save / Saved / List / Get by ID / Add / Delete saved / Toggle save ----
 router.post('/save', auth, async (req, res) => {
   try {
     const { newsId } = req.body;
@@ -230,7 +294,6 @@ router.get('/:newsId', async (req, res) => {
     });
   }
 });
-
 
 router.post('/add', auth, async (req, res) => {
   try {
