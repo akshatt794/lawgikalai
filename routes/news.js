@@ -94,6 +94,7 @@ function getUserIdFromToken(req) {
 }
 
 // ---- Upload (to AWS S3) ----
+// ---- Upload (to AWS S3) ----
 router.post('/upload', upload.single('image'), async (req, res) => {
   let localPath;
   try {
@@ -117,8 +118,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         Body: fs.createReadStream(localPath),
         ContentType: req.file.mimetype
       };
-      if (S3_ACL) putParams.ACL = S3_ACL; // skip ACL when bucket enforces ownership
-
+      if (S3_ACL) putParams.ACL = S3_ACL; // skip ACL if bucket enforces ownership
       await s3.send(new PutObjectCommand(putParams));
 
       imageUrl = `${S3_PUBLIC_BASE}/${key}`;
@@ -136,15 +136,20 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       title, content, category, date, source, summary, fullUpdate,
       sc_said, announced_by, applies_to, legal_impact,
       legal_sections: legalSectionsParsed,
-      image: imageUrl, // null if no file uploaded
+      image: imageUrl,            // try to persist it
       createdAt
     });
 
-    await news.save();
-    res.json({ message: 'News uploaded with extended fields!', news }); // (unchanged)
+    const saved = await news.save();
+
+    // 🔧 Always include `image` in the response, even if schema dropped it.
+    const responseNews = saved.toObject();
+    responseNews.image = imageUrl || responseNews.image || null;
+
+    res.json({ message: 'News uploaded with extended fields!', news: responseNews });
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed', details: err.message }); // (unchanged)
+    res.status(500).json({ error: 'Upload failed', details: err.message });
   } finally {
     if (localPath) {
       fs.promises.unlink(localPath).catch(() => {});
