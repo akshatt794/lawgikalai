@@ -7,9 +7,29 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// ⬇️ NEW: AWS S3 (v3 SDK)
+// ========= AWS S3 (v3) via ENV =========
+const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-south-1';
+const BUCKET =
+  process.env.S3_BUCKET_NAME ||
+  process.env.AWS_S3_BUCKET ||
+  process.env.AWS_BUCKET_NAME; // supports multiple names
+
+const S3_PREFIX = process.env.S3_PREFIX || 'news';
+const S3_ACL = process.env.S3_ACL || 'public-read';
+// If you front with CloudFront or custom domain, set S3_PUBLIC_BASE explicitly
+const S3_PUBLIC_BASE =
+  process.env.S3_PUBLIC_BASE || (BUCKET ? `https://${BUCKET}.s3.${REGION}.amazonaws.com` : '');
+
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const s3 = new S3Client({ region: process.env.AWS_REGION });
+const s3 = new S3Client({
+  region: REGION,
+  // If not using an instance role, these envs will be picked up automatically.
+  // Uncomment to force:
+  // credentials: (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ? {
+  //   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  //   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  // } : undefined
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
@@ -79,24 +99,24 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     let imageUrl = null;
 
     if (req.file) {
+      if (!BUCKET) throw new Error('S3 bucket is not configured via env');
       localPath = req.file.path;
 
-      // NEW: Upload file (image/pdf) to S3
       const ext = path.extname(req.file.originalname || req.file.filename) || '';
-      const key = `news/${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+      const key = `${S3_PREFIX}/${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
 
       await s3.send(new PutObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
+        Bucket: BUCKET,
         Key: key,
         Body: fs.createReadStream(localPath),
         ContentType: req.file.mimetype,
-        ACL: 'public-read' // ensure the object is publicly readable (or use CloudFront)
+        ACL: S3_ACL
       }));
 
-      imageUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+      imageUrl = `${S3_PUBLIC_BASE}/${key}`;
     }
 
-    // NEW: safe parse of legal_sections
+    // safe parse of legal_sections
     let legalSectionsParsed = [];
     if (Array.isArray(legal_sections)) {
       legalSectionsParsed = legal_sections;
@@ -108,15 +128,15 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       title, content, category, date, source, summary, fullUpdate,
       sc_said, announced_by, applies_to, legal_impact,
       legal_sections: legalSectionsParsed,
-      image: imageUrl, // will be null if no file uploaded
+      image: imageUrl,
       createdAt
     });
 
     await news.save();
-    res.json({ message: 'News uploaded with extended fields!', news }); // (unchanged)
+    res.json({ message: 'News uploaded with extended fields!', news }); // unchanged
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed', details: err.message }); // (unchanged)
+    res.status(500).json({ error: 'Upload failed', details: err.message }); // unchanged
   } finally {
     if (localPath) {
       fs.promises.unlink(localPath).catch(() => {});
