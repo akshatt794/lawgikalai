@@ -15,8 +15,9 @@ const BUCKET =
   process.env.AWS_BUCKET_NAME; // supports multiple names
 
 const S3_PREFIX = process.env.S3_PREFIX || 'news';
-const S3_ACL = process.env.S3_ACL || 'public-read';
-// If you front with CloudFront or custom domain, set S3_PUBLIC_BASE explicitly
+// Leave S3_ACL unset for buckets with Object Ownership = Bucket owner enforced
+const S3_ACL = (process.env.S3_ACL && process.env.S3_ACL.trim()) || null;
+// If using CloudFront/custom domain, set S3_PUBLIC_BASE explicitly
 const S3_PUBLIC_BASE =
   process.env.S3_PUBLIC_BASE || (BUCKET ? `https://${BUCKET}.s3.${REGION}.amazonaws.com` : '');
 
@@ -24,7 +25,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const s3 = new S3Client({
   region: REGION,
   // If not using an instance role, these envs will be picked up automatically.
-  // Uncomment to force:
+  // To force credentials, uncomment:
   // credentials: (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ? {
   //   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   //   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
@@ -34,6 +35,7 @@ const s3 = new S3Client({
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
+// Use /tmp in prod (ephemeral) and local path in dev
 const UPLOAD_DIR = process.env.NODE_ENV === 'production' ? '/tmp/uploads/news' : 'uploads/news';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -48,7 +50,11 @@ const storage = multer.diskStorage({
 });
 
 const allowedMimes = [
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf'
 ];
 const fileFilter = (req, file, cb) => {
   if (!allowedMimes.includes(file.mimetype)) {
@@ -105,13 +111,15 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       const ext = path.extname(req.file.originalname || req.file.filename) || '';
       const key = `${S3_PREFIX}/${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
 
-      await s3.send(new PutObjectCommand({
+      const putParams = {
         Bucket: BUCKET,
         Key: key,
         Body: fs.createReadStream(localPath),
-        ContentType: req.file.mimetype,
-        ACL: S3_ACL
-      }));
+        ContentType: req.file.mimetype
+      };
+      if (S3_ACL) putParams.ACL = S3_ACL; // skip ACL when bucket enforces ownership
+
+      await s3.send(new PutObjectCommand(putParams));
 
       imageUrl = `${S3_PUBLIC_BASE}/${key}`;
     }
@@ -128,15 +136,15 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       title, content, category, date, source, summary, fullUpdate,
       sc_said, announced_by, applies_to, legal_impact,
       legal_sections: legalSectionsParsed,
-      image: imageUrl,
+      image: imageUrl, // null if no file uploaded
       createdAt
     });
 
     await news.save();
-    res.json({ message: 'News uploaded with extended fields!', news }); // unchanged
+    res.json({ message: 'News uploaded with extended fields!', news }); // (unchanged)
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed', details: err.message }); // unchanged
+    res.status(500).json({ error: 'Upload failed', details: err.message }); // (unchanged)
   } finally {
     if (localPath) {
       fs.promises.unlink(localPath).catch(() => {});
@@ -180,7 +188,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// ---- Save / Saved / List / Get by ID / Add / Delete saved / Toggle save (unchanged) ----
+// ---- Save / Saved / List / Get by ID / Add / Delete saved / Toggle save ----
 router.post('/save', auth, async (req, res) => {
   try {
     const { newsId } = req.body;
