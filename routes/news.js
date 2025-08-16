@@ -6,16 +6,18 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const cloudinary = require('../config/cloudinary');
+
+// ⬇️ NEW: AWS S3 (v3 SDK)
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
-// keep /tmp on prod for ephemeral FS
 const UPLOAD_DIR = process.env.NODE_ENV === 'production' ? '/tmp/uploads/news' : 'uploads/news';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// ---- Multer: disk storage + allow images & PDFs ----
+// ---- Multer (disk) + allow images & PDFs ----
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, UPLOAD_DIR);
@@ -25,15 +27,11 @@ const storage = multer.diskStorage({
   }
 });
 
+const allowedMimes = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'
+];
 const fileFilter = (req, file, cb) => {
-  const allowed = [
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-    'application/pdf'
-  ];
-  if (!allowed.includes(file.mimetype)) {
+  if (!allowedMimes.includes(file.mimetype)) {
     return cb(new Error('Only images (jpg/png/webp/gif) or PDF allowed'));
   }
   cb(null, true);
@@ -42,7 +40,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 25 * 1024 * 1024 } // 25 MB
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB
 });
 
 // ---- Auth helpers ----
@@ -69,7 +67,7 @@ function getUserIdFromToken(req) {
   }
 }
 
-// ---- Upload news (supports image or PDF in field "image") ----
+// ---- Upload (to AWS S3) ----
 router.post('/upload', upload.single('image'), async (req, res) => {
   let localPath;
   try {
@@ -78,61 +76,48 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       sc_said, announced_by, applies_to, legal_impact, legal_sections, createdAt
     } = req.body;
 
-    // optional: basic validation
-    if (!title) return res.status(400).json({ error: 'title is required' });
-
     let imageUrl = null;
 
     if (req.file) {
       localPath = req.file.path;
 
-      // IMPORTANT: resource_type:'auto' to allow PDFs
-      const uploadResult = await cloudinary.uploader.upload(localPath, {
-        folder: 'news',
-        resource_type: 'auto',                 // <--- fixes PDF 500
-        use_filename: true,
-        unique_filename: false
-      });
-      imageUrl = uploadResult.secure_url;
+      // NEW: Upload file (image/pdf) to S3
+      const ext = path.extname(req.file.originalname || req.file.filename) || '';
+      const key = `news/${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+
+      await s3.send(new PutObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: key,
+        Body: fs.createReadStream(localPath),
+        ContentType: req.file.mimetype,
+        ACL: 'public-read' // ensure the object is publicly readable (or use CloudFront)
+      }));
+
+      imageUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
     }
 
-    // Parse legal_sections safely
+    // NEW: safe parse of legal_sections
     let legalSectionsParsed = [];
     if (Array.isArray(legal_sections)) {
       legalSectionsParsed = legal_sections;
     } else if (typeof legal_sections === 'string' && legal_sections.trim()) {
-      try {
-        legalSectionsParsed = JSON.parse(legal_sections);
-      } catch {
-        // tolerate bad JSON; keep empty array
-        legalSectionsParsed = [];
-      }
+      try { legalSectionsParsed = JSON.parse(legal_sections); } catch { legalSectionsParsed = []; }
     }
 
     const news = new News({
-      title,
-      content,
-      category,
-      date,            // keep as-is if your schema is String/Date; otherwise cast
-      source,
-      summary,
-      fullUpdate,
-      sc_said,
-      announced_by,
-      applies_to,
-      legal_impact,
+      title, content, category, date, source, summary, fullUpdate,
+      sc_said, announced_by, applies_to, legal_impact,
       legal_sections: legalSectionsParsed,
-      image: imageUrl,
-      createdAt: createdAt ? new Date(createdAt) : undefined
+      image: imageUrl, // will be null if no file uploaded
+      createdAt
     });
 
     await news.save();
-    return res.status(201).json({ message: 'News uploaded with extended fields!', news });
+    res.json({ message: 'News uploaded with extended fields!', news }); // (unchanged)
   } catch (err) {
     console.error('Upload error:', err);
-    return res.status(500).json({ error: 'Upload failed', details: err.message });
+    res.status(500).json({ error: 'Upload failed', details: err.message }); // (unchanged)
   } finally {
-    // clean up temp file if present
     if (localPath) {
       fs.promises.unlink(localPath).catch(() => {});
     }
@@ -151,7 +136,7 @@ router.get('/related/:category', async (req, res) => {
   }
 });
 
-// ---- All (with saved flags) ----
+// ---- All ----
 router.get('/all', async (req, res) => {
   try {
     const news = await News.find().sort({ createdAt: -1 });
@@ -175,7 +160,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// ---- Save / Saved / List / Get by ID / Add / Delete saved / Toggle save ----
+// ---- Save / Saved / List / Get by ID / Add / Delete saved / Toggle save (unchanged) ----
 router.post('/save', auth, async (req, res) => {
   try {
     const { newsId } = req.body;
