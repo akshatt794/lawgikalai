@@ -95,6 +95,7 @@ function getUserIdFromToken(req) {
 
 // ---- Upload (to AWS S3) ----
 // ---- Upload (to AWS S3) ----
+// ---- Upload (to AWS S3) ----
 router.post('/upload', upload.single('image'), async (req, res) => {
   let localPath;
   try {
@@ -118,7 +119,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         Body: fs.createReadStream(localPath),
         ContentType: req.file.mimetype
       };
-      if (S3_ACL) putParams.ACL = S3_ACL; // skip ACL if bucket enforces ownership
+      if (S3_ACL) putParams.ACL = S3_ACL; // skip ACL when bucket enforces ownership
       await s3.send(new PutObjectCommand(putParams));
 
       imageUrl = `${S3_PUBLIC_BASE}/${key}`;
@@ -136,26 +137,38 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       title, content, category, date, source, summary, fullUpdate,
       sc_said, announced_by, applies_to, legal_impact,
       legal_sections: legalSectionsParsed,
-      image: imageUrl,            // try to persist it
+      image: imageUrl, // persist if schema has it
       createdAt
     });
 
     const saved = await news.save();
 
-    // 🔧 Always include `image` in the response, even if schema dropped it.
-    const responseNews = saved.toObject();
-    responseNews.image = imageUrl || responseNews.image || null;
+    // --- ensure response order: put `image` right after `legal_sections` ---
+    const base = saved.toObject();
+    const imgValue = imageUrl ?? base.image ?? null;
 
-    res.json({ message: 'News uploaded with extended fields!', news: responseNews });
+    const orderedNews = {};
+    for (const key of Object.keys(base)) {
+      orderedNews[key] = base[key];
+      if (key === 'legal_sections') {
+        // inject image immediately after legal_sections
+        orderedNews.image = imgValue;
+      }
+    }
+    // if for some reason legal_sections isn't present, ensure image exists
+    if (!('image' in orderedNews)) orderedNews.image = imgValue;
+
+    return res.json({ message: 'News uploaded with extended fields!', news: orderedNews });
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed', details: err.message });
+    return res.status(500).json({ error: 'Upload failed', details: err.message });
   } finally {
     if (localPath) {
       fs.promises.unlink(localPath).catch(() => {});
     }
   }
 });
+
 
 // ---- Related by category ----
 router.get('/related/:category', async (req, res) => {
