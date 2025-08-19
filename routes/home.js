@@ -31,25 +31,87 @@ if (FORCE_SIGNED && BUCKET) {
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
 // -------- helpers --------
+
+// Robust: supports many shapes and field names, and can extract from rich content.
 function pickRawImage(n) {
   if (!n) return null;
 
-  if (Array.isArray(n.images) && n.images.length) {
-    const first = n.images[0];
-    if (typeof first === 'string') return first;
-    if (first && typeof first === 'object') return first.secure_url || first.url || first.path || null;
+  const resolveObj = (obj) =>
+    obj?.secure_url ||
+    obj?.url ||
+    obj?.Location ||   // AWS SDK upload resp
+    obj?.path ||
+    obj?.fileUrl ||
+    obj?.imageUrl ||
+    obj?.src ||
+    obj?.href ||
+    obj?.key ||
+    null;
+
+  // 1) Common single fields (string or object)
+  const singleFields = [
+    'image',
+    'imageUrl',
+    'fileUrl',
+    'cover',
+    'coverImage',
+    'cover_image',
+    'banner',
+    'featuredImage',
+    'heroImage',
+    'thumbnail',
+    'thumbnailUrl',
+    'thumb',
+    'url'
+  ];
+  for (const f of singleFields) {
+    const v = n[f];
+    if (!v) continue;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'object') {
+      const r = resolveObj(v);
+      if (r) return r;
+    }
   }
 
-  return (
-    n.image?.secure_url ||
-    n.image?.url ||
-    (typeof n.image === 'string' ? n.image : null) ||
-    n.imageUrl ||
-    n.fileUrl ||
-    n.thumbnailUrl ||
-    n.thumbnail ||
-    null
-  );
+  // 2) Array fields
+  const arrayFields = ['images', 'media', 'attachments', 'files', 'assets', 'photos', 'gallery'];
+  for (const f of arrayFields) {
+    const arr = n[f];
+    if (!Array.isArray(arr) || !arr.length) continue;
+
+    // Prefer explicit image-like entries
+    for (const it of arr) {
+      if (typeof it === 'string') {
+        if (/\.(png|jpe?g|webp|gif|svg)(\?|#|$)/i.test(it)) return it;
+      } else if (it && typeof it === 'object') {
+        if (
+          (it.mimetype && it.mimetype.startsWith('image/')) ||
+          (it.type && String(it.type).startsWith('image/')) ||
+          (it.contentType && String(it.contentType).startsWith('image/'))
+        ) {
+          const r = resolveObj(it);
+          if (r) return r;
+        }
+      }
+    }
+
+    // Otherwise, first resolvable
+    const first = arr[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first === 'object') {
+      const r = resolveObj(first);
+      if (r) return r;
+    }
+  }
+
+  // 3) Extract first image URL from rich content
+  if (typeof n.content === 'string') {
+    const m = n.content.match(/https?:\/\/[^\s)"'<]+?\.(?:png|jpe?g|webp|gif|svg)(?:[?#][^\s)"'<]*)?/i);
+    if (m) return m[0];
+  }
+
+  return null;
 }
 
 function extractS3KeyFromUrl(u) {
@@ -67,8 +129,10 @@ function extractS3KeyFromUrl(u) {
 async function toAwsCompatibleUrl(raw) {
   if (!raw) return null;
 
+  // Local uploads
   if (raw.startsWith('/uploads')) return `${BASE_URL}${raw}`;
 
+  // Absolute HTTPS
   if (/^https?:\/\//i.test(raw)) {
     if (FORCE_SIGNED && BUCKET) {
       const keyFromHttps = extractS3KeyFromUrl(raw);
@@ -83,6 +147,7 @@ async function toAwsCompatibleUrl(raw) {
     return raw;
   }
 
+  // s3://bucket/key
   if (raw.startsWith('s3://')) {
     try {
       const [, , rest] = raw.split('/');
@@ -102,26 +167,29 @@ async function toAwsCompatibleUrl(raw) {
     }
   }
 
+  // Bare S3 key (may include query string)
   if (BUCKET) {
+    const bareKey = raw.replace(/^\//, '');
+    const [keyOnly] = bareKey.split('?'); // strip query for signing
     if (FORCE_SIGNED) {
       return await getSignedUrl(
         s3,
-        new GetObjectCommand({ Bucket: BUCKET, Key: raw }),
+        new GetObjectCommand({ Bucket: BUCKET, Key: keyOnly }),
         { expiresIn: 3600 }
       );
     }
-    if (S3_PUBLIC_BASE) return `${S3_PUBLIC_BASE}/${raw}`;
+    if (S3_PUBLIC_BASE) return `${S3_PUBLIC_BASE}/${bareKey}`;
   }
 
+  // Fallback
   return raw;
 }
 
 /**
  * DocDB-safe date coercion:
- * - If value is already a Date -> use it
- * - If it's a string that *looks* ISO (YYYY-MM-DD...) -> parse with $dateFromString
- * - Else -> null
- * NOTE: DocDB does NOT support onError/onNull in $dateFromString.
+ * - date -> as-is
+ * - ISO-looking string -> $dateFromString
+ * - else -> null
  */
 function safeDateExpr(jsonPath) {
   return {
@@ -136,7 +204,7 @@ function safeDateExpr(jsonPath) {
               {
                 $and: [
                   { $eq: [{ $type: '$$raw' }, 'string'] },
-                  { $regexMatch: { input: '$$raw', regex: /^\d{4}-\d{2}-\d{2}/ } } // ISO-like
+                  { $regexMatch: { input: '$$raw', regex: /^\d{4}-\d{2}-\d{2}/ } }
                 ]
               },
               { $dateFromString: { dateString: '$$raw' } },
@@ -173,12 +241,10 @@ router.get('/', verifyToken, async (req, res) => {
       .limit(10)
       .lean();
 
+    // Remove .select so picker can see every field shape
     const rawNewsPromise = News.find({})
       .sort({ createdAt: -1 })
       .limit(10)
-      .select(
-        'title content image imageUrl fileUrl images thumbnail thumbnailUrl createdAt category source'
-      )
       .lean();
 
     const totalPromise = Case.countDocuments(userMatch);
@@ -187,7 +253,7 @@ router.get('/', verifyToken, async (req, res) => {
       case_status: { $regex: /^closed$/i }
     });
 
-    // Upcoming count (distinct cases having a future hearing) — DocDB-safe
+    // Upcoming count (distinct cases having a future hearing)
     const upcomingAggPromise = Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
@@ -207,7 +273,7 @@ router.get('/', verifyToken, async (req, res) => {
 
     const upcoming = upcomingAgg?.[0]?.count || 0;
 
-    // Nearest upcoming case; fallback to most recent past — DocDB-safe
+    // Nearest upcoming case; fallback to most recent past
     let nearestCaseDoc = await Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
