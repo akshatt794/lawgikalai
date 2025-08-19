@@ -1,9 +1,24 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Announcement = require('../models/Announcement');
 const Case = require('../models/Case');
 const News = require('../models/News');
 const verifyToken = require('../middleware/verifyToken');
+
+function pickImageURL(n) {
+  // Robustly extract a usable URL string from various shapes/fields
+  if (!n) return null;
+  const fromObject =
+    n.image?.secure_url ||
+    n.image?.url ||
+    (Array.isArray(n.image) ? n.image[0] : null) ||
+    n.imageUrl ||
+    n.thumbnailUrl ||
+    n.thumbnail ||
+    (Array.isArray(n.images) ? n.images[0] : null);
+  return fromObject || null;
+}
 
 // GET /api/home - Homepage Data API
 router.get('/', verifyToken, async (req, res) => {
@@ -11,15 +26,23 @@ router.get('/', verifyToken, async (req, res) => {
     const userId = req.user.userId;
     const now = new Date();
 
-    // 1. Get last 10 announcements
-    const announcements = await Announcement.find()
-      .sort({ createdAt: -1 })
-      .limit(10);
+    // Prepare both ObjectId and string match (covers schemas storing userId as ObjectId or string)
+    const oid = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : null;
+    const userMatch = {
+      $or: [
+        ...(oid ? [{ userId: oid }] : []),
+        { $expr: { $eq: [{ $toString: '$userId' }, String(userId)] } }
+      ]
+    };
 
-    // 2. Get nearest upcoming case for the user
-    //    (handles when hearing_details is an array)
+    // 1) Announcements
+    const announcements = await Announcement.find().sort({ createdAt: -1 }).limit(10);
+
+    // 2) Nearest upcoming case (unwind array, handle userId type differences)
     let nearestCaseDoc = await Case.aggregate([
-      { $match: { userId } },
+      { $match: userMatch },
       { $unwind: '$hearing_details' },
       { $match: { 'hearing_details.next_hearing_date': { $gte: now } } },
       { $sort: { 'hearing_details.next_hearing_date': 1 } },
@@ -35,10 +58,10 @@ router.get('/', verifyToken, async (req, res) => {
       { $limit: 1 }
     ]);
 
-    // Fallback: if no upcoming, pick the most recent past hearing
+    // Fallback to most recent past hearing if no upcoming exists
     if (!nearestCaseDoc[0]) {
       nearestCaseDoc = await Case.aggregate([
-        { $match: { userId } },
+        { $match: userMatch },
         { $unwind: '$hearing_details' },
         { $match: { 'hearing_details.next_hearing_date': { $lte: now } } },
         { $sort: { 'hearing_details.next_hearing_date': -1 } },
@@ -56,29 +79,25 @@ router.get('/', verifyToken, async (req, res) => {
     }
     const nearestCase = nearestCaseDoc[0] || null;
 
-    // 3. Case stats
-    const total = await Case.countDocuments({ userId });
+    // 3) Stats (use $or to support both userId types + array elemMatch)
+    const total = await Case.countDocuments(userMatch);
     const upcoming = await Case.countDocuments({
-      userId,
+      ...userMatch,
       hearing_details: { $elemMatch: { next_hearing_date: { $gte: now } } }
     });
-    const closed = await Case.countDocuments({ userId, case_status: 'Closed' });
+    const closed = await Case.countDocuments({ ...userMatch, case_status: 'Closed' });
 
-    // 4. Get latest top 10 news (ensure image is a URL string in the same 'image' field)
+    // 4) News (return image as a URL string in same 'image' key)
     const rawNews = await News.find()
       .sort({ createdAt: -1 })
       .limit(10)
-      .select('title content image imageUrl createdAt');
+      .select('title content image imageUrl images thumbnail thumbnailUrl createdAt')
+      .lean();
 
-    const news = rawNews.map(doc => {
-      const n = doc.toObject();
-      // prefer nested url -> imageUrl field -> plain image (unchanged)
-      const img =
-        (n.image && n.image.url) ||
-        n.imageUrl ||
-        n.image;
-      return { ...n, image: img };
-    });
+    const news = rawNews.map(n => ({
+      ...n,
+      image: pickImageURL(n) // ensure the 'image' field is a URL string
+    }));
 
     res.json({
       message: 'Home data fetched',
