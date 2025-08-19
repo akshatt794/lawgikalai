@@ -6,18 +6,23 @@ const Case = require('../models/Case');
 const News = require('../models/News');
 const verifyToken = require('../middleware/verifyToken');
 
+const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
+
 function pickImageURL(n) {
-  // Robustly extract a usable URL string from various shapes/fields
   if (!n) return null;
-  const fromObject =
+  const url =
     n.image?.secure_url ||
     n.image?.url ||
-    (Array.isArray(n.image) ? n.image[0] : null) ||
+    (typeof n.image === 'string' ? n.image : null) ||
     n.imageUrl ||
     n.thumbnailUrl ||
     n.thumbnail ||
     (Array.isArray(n.images) ? n.images[0] : null);
-  return fromObject || null;
+
+  if (typeof url === 'string' && url.startsWith('/uploads')) {
+    return `${BASE_URL}${url}`;
+  }
+  return url || null;
 }
 
 // GET /api/home - Homepage Data API
@@ -26,7 +31,7 @@ router.get('/', verifyToken, async (req, res) => {
     const userId = req.user.userId;
     const now = new Date();
 
-    // Prepare both ObjectId and string match (covers schemas storing userId as ObjectId or string)
+    // Match userId as ObjectId or string
     const oid = mongoose.Types.ObjectId.isValid(userId)
       ? new mongoose.Types.ObjectId(userId)
       : null;
@@ -38,19 +43,32 @@ router.get('/', verifyToken, async (req, res) => {
     };
 
     // 1) Announcements
-    const announcements = await Announcement.find().sort({ createdAt: -1 }).limit(10);
+    const announcements = await Announcement.find()
+      .sort({ createdAt: -1 })
+      .limit(10);
 
-    // 2) Nearest upcoming case (unwind array, handle userId type differences)
+    // 2) Nearest upcoming case (convert string dates to Date before compare)
     let nearestCaseDoc = await Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
-      { $match: { 'hearing_details.next_hearing_date': { $gte: now } } },
-      { $sort: { 'hearing_details.next_hearing_date': 1 } },
+      {
+        $addFields: {
+          _hd_next: {
+            $cond: [
+              { $gte: [{ $type: '$hearing_details.next_hearing_date' }, 'string'] },
+              { $toDate: '$hearing_details.next_hearing_date' },
+              '$hearing_details.next_hearing_date'
+            ]
+          }
+        }
+      },
+      { $match: { _hd_next: { $gte: now } } },
+      { $sort: { _hd_next: 1 } },
       {
         $project: {
           _id: 1,
           case_title: 1,
-          'hearing_details.next_hearing_date': 1,
+          'hearing_details.next_hearing_date': '$_hd_next',
           'hearing_details.time': 1,
           court_name: 1
         }
@@ -58,18 +76,29 @@ router.get('/', verifyToken, async (req, res) => {
       { $limit: 1 }
     ]);
 
-    // Fallback to most recent past hearing if no upcoming exists
+    // Fallback: most recent past hearing
     if (!nearestCaseDoc[0]) {
       nearestCaseDoc = await Case.aggregate([
         { $match: userMatch },
         { $unwind: '$hearing_details' },
-        { $match: { 'hearing_details.next_hearing_date': { $lte: now } } },
-        { $sort: { 'hearing_details.next_hearing_date': -1 } },
+        {
+          $addFields: {
+            _hd_next: {
+              $cond: [
+                { $gte: [{ $type: '$hearing_details.next_hearing_date' }, 'string'] },
+                { $toDate: '$hearing_details.next_hearing_date' },
+                '$hearing_details.next_hearing_date'
+              ]
+            }
+          }
+        },
+        { $match: { _hd_next: { $lte: now } } },
+        { $sort: { _hd_next: -1 } },
         {
           $project: {
             _id: 1,
             case_title: 1,
-            'hearing_details.next_hearing_date': 1,
+            'hearing_details.next_hearing_date': '$_hd_next',
             'hearing_details.time': 1,
             court_name: 1
           }
@@ -79,32 +108,43 @@ router.get('/', verifyToken, async (req, res) => {
     }
     const nearestCase = nearestCaseDoc[0] || null;
 
-    // 3) Stats (use $or to support both userId types + array elemMatch)
+    // 3) Stats
     const total = await Case.countDocuments(userMatch);
-    const upcoming = await Case.countDocuments({
-      ...userMatch,
-      hearing_details: { $elemMatch: { next_hearing_date: { $gte: now } } }
-    });
+
+    // upcoming count with date conversion
+    const upcomingAgg = await Case.aggregate([
+      { $match: userMatch },
+      { $unwind: '$hearing_details' },
+      {
+        $addFields: {
+          _hd_next: {
+            $cond: [
+              { $gte: [{ $type: '$hearing_details.next_hearing_date' }, 'string'] },
+              { $toDate: '$hearing_details.next_hearing_date' },
+              '$hearing_details.next_hearing_date'
+            ]
+          }
+        }
+      },
+      { $match: { _hd_next: { $gte: now } } },
+      { $group: { _id: '$_id' } }, // distinct cases with upcoming hearing
+      { $count: 'count' }
+    ]);
+    const upcoming = upcomingAgg[0]?.count || 0;
+
     const closed = await Case.countDocuments({ ...userMatch, case_status: 'Closed' });
 
-    // 4) News (return image as a URL string in same 'image' key)
+    // 4) News (normalize image to URL string)
     const rawNews = await News.find()
-  .sort({ createdAt: -1 })
-  .limit(10)
-  .select('title content image imageUrl createdAt')
-  .lean();
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('title content image imageUrl createdAt')
+      .lean();
 
-const news = rawNews.map(n => ({
-  ...n,
-  image: (
-    n?.image?.secure_url ||
-    n?.image?.url ||
-    (typeof n?.image === 'string' ? n.image : null) ||
-    n?.imageUrl ||
-    null
-  )
-}));
-
+    const news = rawNews.map(n => ({
+      ...n,
+      image: pickImageURL(n)
+    }));
 
     res.json({
       message: 'Home data fetched',
