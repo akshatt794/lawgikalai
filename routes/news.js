@@ -93,8 +93,26 @@ function getUserIdFromToken(req) {
   }
 }
 
-// ---- Upload (to AWS S3) ----
-// ---- Upload (to AWS S3) ----
+// ---- helpers ----
+function pickImageURL(obj) {
+  // returns a plain URL string if available; otherwise null
+  if (!obj) return null;
+  // for Mongoose docs, call toObject/lean before when needed; we only read known keys here
+  const img =
+    obj?.image?.secure_url ||
+    obj?.image?.url ||
+    (typeof obj?.image === 'string' ? obj.image : null) ||
+    obj?.imageUrl ||
+    obj?.thumbnailUrl ||
+    null;
+
+  // keep legacy local uploads behaviour
+  if (img && typeof img === 'string' && img.startsWith('/uploads')) {
+    return `${BASE_URL}${img}`;
+  }
+  return img;
+}
+
 // ---- Upload (to AWS S3) ----
 router.post('/upload', upload.single('image'), async (req, res) => {
   let localPath;
@@ -134,39 +152,43 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     }
 
     // Build a base object
-const data = {
-  title, content, category, date, source, summary, fullUpdate,
-  sc_said, announced_by, applies_to, legal_impact,
-  legal_sections: legalSectionsParsed,
-  createdAt
-};
+    const data = {
+      title, content, category, date, source, summary, fullUpdate,
+      sc_said, announced_by, applies_to, legal_impact,
+      legal_sections: legalSectionsParsed,
+      createdAt
+    };
 
-// Put the S3 URL where your schema expects it
-if (imageUrl) {
-  const imagePath = News.schema.path('image');
+    // Put the S3 URL where your schema expects it
+    if (imageUrl) {
+      const imagePath = News.schema.path('image');
 
-  if (imagePath && imagePath.instance === 'String') {
-    // Schema: image: String
-    data.image = imageUrl;
-  } else if (imagePath && (imagePath.instance === 'Embedded' || imagePath.instance === 'Mixed')) {
-    // Schema: image: { url: String } (or Mixed)
-    data.image = { url: imageUrl };
-  } else if (News.schema.path('imageUrl')) {
-    // Schema uses imageUrl instead of image
-    data.imageUrl = imageUrl;
-  } else {
-    // Fallback: save as flat string
-    data.image = imageUrl;
-  }
-}
+      if (imagePath && imagePath.instance === 'String') {
+        // Schema: image: String
+        data.image = imageUrl;
+      } else if (imagePath && (imagePath.instance === 'Embedded' || imagePath.instance === 'Mixed')) {
+        // Schema: image: { url: String } (or Mixed)
+        data.image = { url: imageUrl };
+      } else if (News.schema.path('imageUrl')) {
+        // Schema uses imageUrl instead of image
+        data.imageUrl = imageUrl;
+      } else {
+        // Fallback: save as flat string
+        data.image = imageUrl;
+      }
+    }
 
-const news = new News(data);
-const saved = await news.save();
-
+    const news = new News(data);
+    const saved = await news.save();
 
     // --- ensure response order: put `image` right after `legal_sections` ---
     const base = saved.toObject();
-    const imgValue = imageUrl ?? base.image ?? null;
+    const imgValue =
+      imageUrl ||
+      base?.image?.url ||
+      (typeof base?.image === 'string' ? base.image : null) ||
+      base?.imageUrl ||
+      null;
 
     const orderedNews = {};
     for (const key of Object.keys(base)) {
@@ -189,7 +211,6 @@ const saved = await news.save();
     }
   }
 });
-
 
 // ---- Related by category ----
 router.get('/related/:category', async (req, res) => {
@@ -216,11 +237,14 @@ router.get('/all', async (req, res) => {
       }
     }
 
-    const formatted = news.map(n => ({
-      ...n.toObject(),
-      image: n.image?.startsWith('/uploads') ? `${BASE_URL}${n.image}` : n.image,
-      isSaved: savedIds.includes(n._id.toString())
-    }));
+    const formatted = news.map(n => {
+      const obj = n.toObject();
+      return {
+        ...obj,
+        image: pickImageURL(obj), // normalize to URL string
+        isSaved: savedIds.includes(n._id.toString())
+      };
+    });
     res.json({ news: formatted });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -252,14 +276,14 @@ router.get('/saved', auth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const formattedNews = user.savedNews.map(news => {
+      const obj = news.toObject();
       const createdAt = new Date(news.createdAt);
       const formattedDate = createdAt.toLocaleDateString('en-GB', {
         day: '2-digit', month: 'long', year: 'numeric'
       });
-      const imageUrl = news.image?.startsWith('/uploads') ? `${BASE_URL}${news.image}` : news.image;
       return {
-        ...news.toObject(),
-        image: imageUrl,
+        ...obj,
+        image: pickImageURL(obj), // normalize to URL string
         createdAt: formattedDate,
         isSaved: true
       };
@@ -289,11 +313,14 @@ router.get('/list', async (req, res) => {
       }
     }
 
-    const formatted = news.map(n => ({
-      ...n.toObject(),
-      image: n.image?.startsWith('/uploads') ? `${BASE_URL}${n.image}` : n.image,
-      isSaved: savedIds.includes(n._id.toString())
-    }));
+    const formatted = news.map(n => {
+      const obj = n.toObject();
+      return {
+        ...obj,
+        image: pickImageURL(obj), // normalize to URL string
+        isSaved: savedIds.includes(n._id.toString())
+      };
+    });
 
     res.json({
       message: 'News list fetched',
@@ -327,14 +354,13 @@ router.get('/:newsId', async (req, res) => {
       return res.status(404).json({ error: 'News not found' });
     }
 
-    const imageUrl = newsItem.image?.startsWith('/uploads')
-      ? `${BASE_URL}${newsItem.image}`
-      : newsItem.image;
+    const obj = newsItem.toObject();
+    const imageUrl = pickImageURL(obj); // normalize to URL string
 
     res.status(200).json({
       message: 'News by ID fetched successfully',
       news: {
-        ...newsItem.toObject(),
+        ...obj,
         image: imageUrl,
         isSaved
       }
