@@ -7,82 +7,68 @@ const Case = require('../models/Case');
 const News = require('../models/News');
 const verifyToken = require('../middleware/verifyToken');
 
-// ===== AWS presign (optional) =====
-const REGION =
-  process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-south-1';
-
+// ===== AWS (optional presign) =====
+const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-south-1';
 const BUCKET =
   process.env.S3_BUCKET_NAME ||
   process.env.AWS_S3_BUCKET ||
   process.env.AWS_BUCKET_NAME ||
-  ''; // optional unless you need presign or a public base
+  '';
 
 const S3_PUBLIC_BASE =
-  process.env.S3_PUBLIC_BASE ||
-  (BUCKET ? `https://${BUCKET}.s3.${REGION}.amazonaws.com` : '');
+  process.env.S3_PUBLIC_BASE || (BUCKET ? `https://${BUCKET}.s3.${REGION}.amazonaws.com` : '');
 
-const FORCE_SIGNED =
-  String(process.env.S3_FORCE_SIGNED || '').toLowerCase() === 'true';
+const FORCE_SIGNED = String(process.env.S3_FORCE_SIGNED || '').toLowerCase() === 'true';
 
-// Lazy-import AWS SDK pieces only if needed
 let s3, getSignedUrl, GetObjectCommand;
 if (FORCE_SIGNED && BUCKET) {
   const { S3Client, GetObjectCommand: _GetObjectCommand } = require('@aws-sdk/client-s3');
   ({ getSignedUrl } = require('@aws-sdk/s3-request-presigner'));
   GetObjectCommand = _GetObjectCommand;
-  s3 = new S3Client({ region: REGION }); // uses env/instance creds automatically
+  s3 = new S3Client({ region: REGION });
 }
 
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
-/** Pick the raw image reference from a News doc (handles many shapes). */
+// -------- helpers --------
 function pickRawImage(n) {
   if (!n) return null;
 
-  // arrays of strings or objects
   if (Array.isArray(n.images) && n.images.length) {
     const first = n.images[0];
     if (typeof first === 'string') return first;
-    if (first && typeof first === 'object') {
-      return first.secure_url || first.url || first.path || null;
-    }
+    if (first && typeof first === 'object') return first.secure_url || first.url || first.path || null;
   }
 
-  // common single fields
-  const url =
+  return (
     n.image?.secure_url ||
     n.image?.url ||
     (typeof n.image === 'string' ? n.image : null) ||
     n.imageUrl ||
-    n.fileUrl || // sometimes you store fileUrl for S3
+    n.fileUrl ||
     n.thumbnailUrl ||
-    n.thumbnail;
-
-  return url || null;
+    n.thumbnail ||
+    null
+  );
 }
 
-/** When given a public S3 URL for our bucket, return the object key. */
 function extractS3KeyFromUrl(u) {
   try {
     const parsed = new URL(u);
-    // https://<bucket>.s3.<region>.amazonaws.com/<key>
     if (BUCKET && parsed.hostname.startsWith(`${BUCKET}.s3`)) {
       return decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
     }
-    return null; // unknown format or different bucket
+    return null;
   } catch {
     return null;
   }
 }
 
-/** Normalize any image reference to a usable URL (local/https/S3 key/s3:// form). */
 async function toAwsCompatibleUrl(raw) {
   if (!raw) return null;
 
-  // Local uploads from your server
   if (raw.startsWith('/uploads')) return `${BASE_URL}${raw}`;
 
-  // Already an absolute http(s) URL (Cloudinary, public S3, etc.)
   if (/^https?:\/\//i.test(raw)) {
     if (FORCE_SIGNED && BUCKET) {
       const keyFromHttps = extractS3KeyFromUrl(raw);
@@ -97,13 +83,12 @@ async function toAwsCompatibleUrl(raw) {
     return raw;
   }
 
-  // s3://bucket/key
   if (raw.startsWith('s3://')) {
     try {
       const [, , rest] = raw.split('/');
       const [bucketCandidate, ...parts] = rest.split('/');
       const key = parts.join('/');
-      if (!BUCKET || bucketCandidate !== BUCKET) return raw; // other bucket, leave as-is
+      if (!BUCKET || bucketCandidate !== BUCKET) return raw;
       if (FORCE_SIGNED) {
         return await getSignedUrl(
           s3,
@@ -117,7 +102,6 @@ async function toAwsCompatibleUrl(raw) {
     }
   }
 
-  // Treat as bare S3 key (e.g., "news/abc.jpg")
   if (BUCKET) {
     if (FORCE_SIGNED) {
       return await getSignedUrl(
@@ -129,24 +113,33 @@ async function toAwsCompatibleUrl(raw) {
     if (S3_PUBLIC_BASE) return `${S3_PUBLIC_BASE}/${raw}`;
   }
 
-  // Fallback as-is
   return raw;
 }
 
-/** Robustly coerce next_hearing_date (string or date) to Date during aggregation. */
-function dateCoercionExpression(path) {
-  // $type guard -> if date, use as is; if string, parse; else null
+/**
+ * DocDB-safe date coercion:
+ * - If value is already a Date -> use it
+ * - If it's a string that *looks* ISO (YYYY-MM-DD...) -> parse with $dateFromString
+ * - Else -> null
+ * NOTE: DocDB does NOT support onError/onNull in $dateFromString.
+ */
+function safeDateExpr(jsonPath) {
   return {
     $let: {
-      vars: { raw: path },
+      vars: { raw: jsonPath },
       in: {
         $cond: [
           { $eq: [{ $type: '$$raw' }, 'date'] },
           '$$raw',
           {
             $cond: [
-              { $eq: [{ $type: '$$raw' }, 'string'] },
-              { $dateFromString: { dateString: '$$raw', onError: null, onNull: null } },
+              {
+                $and: [
+                  { $eq: [{ $type: '$$raw' }, 'string'] },
+                  { $regexMatch: { input: '$$raw', regex: /^\d{4}-\d{2}-\d{2}/ } } // ISO-like
+                ]
+              },
+              { $dateFromString: { dateString: '$$raw' } },
               null
             ]
           }
@@ -156,7 +149,7 @@ function dateCoercionExpression(path) {
   };
 }
 
-// GET /api/home
+// ========== GET /api/home ==========
 router.get('/', verifyToken, async (req, res) => {
   try {
     const userId = String(req.user.userId || '');
@@ -170,11 +163,11 @@ router.get('/', verifyToken, async (req, res) => {
     const userMatch = {
       $or: [
         ...(oid ? [{ userId: oid }] : []),
-        { userId } // exact string match
+        { userId } // exact string
       ]
     };
 
-    // Fetch announcements, news, and basic stats concurrently
+    // Parallel fetches
     const announcementsPromise = Announcement.find({})
       .sort({ createdAt: -1 })
       .limit(10)
@@ -194,21 +187,16 @@ router.get('/', verifyToken, async (req, res) => {
       case_status: { $regex: /^closed$/i }
     });
 
-    // Upcoming count via aggregation (distinct cases having a future hearing)
+    // Upcoming count (distinct cases having a future hearing) — DocDB-safe
     const upcomingAggPromise = Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
-      {
-        $addFields: {
-          _hd_next: dateCoercionExpression('$hearing_details.next_hearing_date')
-        }
-      },
+      { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
       { $match: { _hd_next: { $ne: null, $gte: now } } },
       { $group: { _id: '$_id' } },
       { $count: 'count' }
     ]);
 
-    // Await concurrent parts
     const [announcements, rawNews, total, closed, upcomingAgg] = await Promise.all([
       announcementsPromise,
       rawNewsPromise,
@@ -219,15 +207,11 @@ router.get('/', verifyToken, async (req, res) => {
 
     const upcoming = upcomingAgg?.[0]?.count || 0;
 
-    // Find nearest upcoming case for this user; fallback to most recent past
+    // Nearest upcoming case; fallback to most recent past — DocDB-safe
     let nearestCaseDoc = await Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
-      {
-        $addFields: {
-          _hd_next: dateCoercionExpression('$hearing_details.next_hearing_date')
-        }
-      },
+      { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
       { $match: { _hd_next: { $ne: null, $gte: now } } },
       { $sort: { _hd_next: 1 } },
       {
@@ -246,11 +230,7 @@ router.get('/', verifyToken, async (req, res) => {
       nearestCaseDoc = await Case.aggregate([
         { $match: userMatch },
         { $unwind: '$hearing_details' },
-        {
-          $addFields: {
-            _hd_next: dateCoercionExpression('$hearing_details.next_hearing_date')
-          }
-        },
+        { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
         { $match: { _hd_next: { $ne: null, $lte: now } } },
         { $sort: { _hd_next: -1 } },
         {
