@@ -42,6 +42,7 @@ function pickRawImage(n) {
     n.image?.url ||
     (typeof n.image === 'string' ? n.image : null) ||
     n.imageUrl ||
+    n.fileUrl ||         // 👈 added
     n.thumbnailUrl ||
     n.thumbnail ||
     (Array.isArray(n.images) ? n.images[0] : null);
@@ -238,7 +239,8 @@ router.get('/', verifyToken, async (req, res) => {
     const rawNews = await News.find()
       .sort({ createdAt: -1 })
       .limit(10)
-      .select('+image title content imageUrl images thumbnail thumbnailUrl createdAt') // +image in case select:false
+      .select('title content image imageUrl fileUrl images thumbnail thumbnailUrl createdAt') // include all possible fields
+      // +image in case select:false
       .lean();
 
     // Resolve each image into a usable URL (public or presigned)
