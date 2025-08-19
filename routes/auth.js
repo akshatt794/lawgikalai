@@ -10,6 +10,16 @@ const verifyToken = require('../middleware/verifyToken');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// 🔒 Common cookie options (DO NOT affect JSON responses)
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  // For cross-site frontends (different domain/port), 'none' is required & must be secure
+  sameSite: process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
+  secure: process.env.NODE_ENV === 'production', // requires HTTPS in prod
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+};
+
 const auth = (req, res, next) => {
   const header = req.headers.authorization;
   if (!header) return res.status(401).json({ error: 'Missing token' });
@@ -34,6 +44,9 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+
+    // ✅ Set cookie (response body unchanged)
+    res.cookie('token', token, COOKIE_OPTIONS);
 
     res.json({
       message: "Login successful.",
@@ -172,6 +185,9 @@ router.post('/verify-otp', async (req, res) => {
     await user.save();
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+
+    // ✅ Set cookie (response body unchanged)
+    res.cookie('token', token, COOKIE_OPTIONS);
 
     res.json({
       message: "OTP verified successfully.",
@@ -351,6 +367,12 @@ router.delete('/delete-account', auth, async (req, res) => {
 // LOGOUT
 router.post('/logout', auth, async (req, res) => {
   try {
+    // ✅ Clear cookie (response body unchanged)
+    res.clearCookie('token', {
+      ...COOKIE_OPTIONS,
+      maxAge: 0
+    });
+
     res.json({ message: 'Logout successful. Please clear your token on client side.' });
   } catch (err) {
     res.status(500).json({ error: 'Logout failed', details: err.message });
@@ -376,6 +398,9 @@ router.post('/login-phone', async (req, res) => {
       { userId: user._id },
       process.env.JWT_SECRET || 'your_jwt_secret'
     );
+
+    // ✅ Set cookie (response body unchanged)
+    res.cookie('token', token, COOKIE_OPTIONS);
 
     res.json({
       message: "Login successful.",

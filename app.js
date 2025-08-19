@@ -80,6 +80,7 @@ app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', ordersRoutes);
 app.use('/api/test', testDocumentDbRoute);
+app.use(cookieParser());
 
 app.use(express.json());
 // 5. Base route
