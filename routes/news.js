@@ -133,15 +133,36 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       try { legalSectionsParsed = JSON.parse(legal_sections); } catch { legalSectionsParsed = []; }
     }
 
-    const news = new News({
-      title, content, category, date, source, summary, fullUpdate,
-      sc_said, announced_by, applies_to, legal_impact,
-      legal_sections: legalSectionsParsed,
-      image: imageUrl, // persist if schema has it
-      createdAt
-    });
+    // Build a base object
+const data = {
+  title, content, category, date, source, summary, fullUpdate,
+  sc_said, announced_by, applies_to, legal_impact,
+  legal_sections: legalSectionsParsed,
+  createdAt
+};
 
-    const saved = await news.save();
+// Put the S3 URL where your schema expects it
+if (imageUrl) {
+  const imagePath = News.schema.path('image');
+
+  if (imagePath && imagePath.instance === 'String') {
+    // Schema: image: String
+    data.image = imageUrl;
+  } else if (imagePath && (imagePath.instance === 'Embedded' || imagePath.instance === 'Mixed')) {
+    // Schema: image: { url: String } (or Mixed)
+    data.image = { url: imageUrl };
+  } else if (News.schema.path('imageUrl')) {
+    // Schema uses imageUrl instead of image
+    data.imageUrl = imageUrl;
+  } else {
+    // Fallback: save as flat string
+    data.image = imageUrl;
+  }
+}
+
+const news = new News(data);
+const saved = await news.save();
+
 
     // --- ensure response order: put `image` right after `legal_sections` ---
     const base = saved.toObject();

@@ -89,15 +89,22 @@ router.get('/', verifyToken, async (req, res) => {
 
     // 4) News (return image as a URL string in same 'image' key)
     const rawNews = await News.find()
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .select('title content image imageUrl images thumbnail thumbnailUrl createdAt')
-      .lean();
+  .sort({ createdAt: -1 })
+  .limit(10)
+  .select('title content image imageUrl createdAt')
+  .lean();
 
-    const news = rawNews.map(n => ({
-      ...n,
-      image: pickImageURL(n) // ensure the 'image' field is a URL string
-    }));
+const news = rawNews.map(n => ({
+  ...n,
+  image: (
+    n?.image?.secure_url ||
+    n?.image?.url ||
+    (typeof n?.image === 'string' ? n.image : null) ||
+    n?.imageUrl ||
+    null
+  )
+}));
+
 
     res.json({
       message: 'Home data fetched',
