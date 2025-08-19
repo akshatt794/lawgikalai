@@ -31,87 +31,23 @@ if (FORCE_SIGNED && BUCKET) {
 const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
 
 // -------- helpers --------
-
-// Robust: supports many shapes and field names, and can extract from rich content.
 function pickRawImage(n) {
   if (!n) return null;
-
-  const resolveObj = (obj) =>
-    obj?.secure_url ||
-    obj?.url ||
-    obj?.Location ||   // AWS SDK upload resp
-    obj?.path ||
-    obj?.fileUrl ||
-    obj?.imageUrl ||
-    obj?.src ||
-    obj?.href ||
-    obj?.key ||
-    null;
-
-  // 1) Common single fields (string or object)
-  const singleFields = [
-    'image',
-    'imageUrl',
-    'fileUrl',
-    'cover',
-    'coverImage',
-    'cover_image',
-    'banner',
-    'featuredImage',
-    'heroImage',
-    'thumbnail',
-    'thumbnailUrl',
-    'thumb',
-    'url'
-  ];
-  for (const f of singleFields) {
-    const v = n[f];
-    if (!v) continue;
-    if (typeof v === 'string') return v;
-    if (typeof v === 'object') {
-      const r = resolveObj(v);
-      if (r) return r;
-    }
-  }
-
-  // 2) Array fields
-  const arrayFields = ['images', 'media', 'attachments', 'files', 'assets', 'photos', 'gallery'];
-  for (const f of arrayFields) {
-    const arr = n[f];
-    if (!Array.isArray(arr) || !arr.length) continue;
-
-    // Prefer explicit image-like entries
-    for (const it of arr) {
-      if (typeof it === 'string') {
-        if (/\.(png|jpe?g|webp|gif|svg)(\?|#|$)/i.test(it)) return it;
-      } else if (it && typeof it === 'object') {
-        if (
-          (it.mimetype && it.mimetype.startsWith('image/')) ||
-          (it.type && String(it.type).startsWith('image/')) ||
-          (it.contentType && String(it.contentType).startsWith('image/'))
-        ) {
-          const r = resolveObj(it);
-          if (r) return r;
-        }
-      }
-    }
-
-    // Otherwise, first resolvable
-    const first = arr[0];
+  if (Array.isArray(n.images) && n.images.length) {
+    const first = n.images[0];
     if (typeof first === 'string') return first;
-    if (first && typeof first === 'object') {
-      const r = resolveObj(first);
-      if (r) return r;
-    }
+    if (first && typeof first === 'object') return first.secure_url || first.url || first.path || null;
   }
-
-  // 3) Extract first image URL from rich content
-  if (typeof n.content === 'string') {
-    const m = n.content.match(/https?:\/\/[^\s)"'<]+?\.(?:png|jpe?g|webp|gif|svg)(?:[?#][^\s)"'<]*)?/i);
-    if (m) return m[0];
-  }
-
-  return null;
+  return (
+    n.image?.secure_url ||
+    n.image?.url ||
+    (typeof n.image === 'string' ? n.image : null) ||
+    n.imageUrl ||
+    n.fileUrl ||
+    n.thumbnailUrl ||
+    n.thumbnail ||
+    null
+  );
 }
 
 function extractS3KeyFromUrl(u) {
@@ -129,10 +65,8 @@ function extractS3KeyFromUrl(u) {
 async function toAwsCompatibleUrl(raw) {
   if (!raw) return null;
 
-  // Local uploads
   if (raw.startsWith('/uploads')) return `${BASE_URL}${raw}`;
 
-  // Absolute HTTPS
   if (/^https?:\/\//i.test(raw)) {
     if (FORCE_SIGNED && BUCKET) {
       const keyFromHttps = extractS3KeyFromUrl(raw);
@@ -147,7 +81,6 @@ async function toAwsCompatibleUrl(raw) {
     return raw;
   }
 
-  // s3://bucket/key
   if (raw.startsWith('s3://')) {
     try {
       const [, , rest] = raw.split('/');
@@ -167,30 +100,22 @@ async function toAwsCompatibleUrl(raw) {
     }
   }
 
-  // Bare S3 key (may include query string)
   if (BUCKET) {
     const bareKey = raw.replace(/^\//, '');
-    const [keyOnly] = bareKey.split('?'); // strip query for signing
     if (FORCE_SIGNED) {
       return await getSignedUrl(
         s3,
-        new GetObjectCommand({ Bucket: BUCKET, Key: keyOnly }),
+        new GetObjectCommand({ Bucket: BUCKET, Key: bareKey }),
         { expiresIn: 3600 }
       );
     }
     if (S3_PUBLIC_BASE) return `${S3_PUBLIC_BASE}/${bareKey}`;
   }
 
-  // Fallback
   return raw;
 }
 
-/**
- * DocDB-safe date coercion:
- * - date -> as-is
- * - ISO-looking string -> $dateFromString
- * - else -> null
- */
+// DocDB-safe date coercion
 function safeDateExpr(jsonPath) {
   return {
     $let: {
@@ -223,7 +148,6 @@ router.get('/', verifyToken, async (req, res) => {
     const userId = String(req.user.userId || '');
     const now = new Date();
 
-    // Match userId stored as ObjectId OR string
     const oid = mongoose.Types.ObjectId.isValid(userId)
       ? new mongoose.Types.ObjectId(userId)
       : null;
@@ -231,17 +155,15 @@ router.get('/', verifyToken, async (req, res) => {
     const userMatch = {
       $or: [
         ...(oid ? [{ userId: oid }] : []),
-        { userId } // exact string
+        { userId }
       ]
     };
 
-    // Parallel fetches
     const announcementsPromise = Announcement.find({})
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
 
-    // Remove .select so picker can see every field shape
     const rawNewsPromise = News.find({})
       .sort({ createdAt: -1 })
       .limit(10)
@@ -253,7 +175,6 @@ router.get('/', verifyToken, async (req, res) => {
       case_status: { $regex: /^closed$/i }
     });
 
-    // Upcoming count (distinct cases having a future hearing)
     const upcomingAggPromise = Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
@@ -273,25 +194,16 @@ router.get('/', verifyToken, async (req, res) => {
 
     const upcoming = upcomingAgg?.[0]?.count || 0;
 
-    // Nearest upcoming case; fallback to most recent past
+    // nearest case
     let nearestCaseDoc = await Case.aggregate([
       { $match: userMatch },
       { $unwind: '$hearing_details' },
       { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
       { $match: { _hd_next: { $ne: null, $gte: now } } },
       { $sort: { _hd_next: 1 } },
-      {
-        $project: {
-          _id: 1,
-          case_title: 1,
-          court_name: 1,
-          'hearing_details.time': 1,
-          'hearing_details.next_hearing_date': '$_hd_next'
-        }
-      },
+      { $project: { _id: 1, case_title: 1, court_name: 1, 'hearing_details.time': 1, 'hearing_details.next_hearing_date': '$_hd_next' } },
       { $limit: 1 }
     ]);
-
     if (!nearestCaseDoc[0]) {
       nearestCaseDoc = await Case.aggregate([
         { $match: userMatch },
@@ -299,27 +211,24 @@ router.get('/', verifyToken, async (req, res) => {
         { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
         { $match: { _hd_next: { $ne: null, $lte: now } } },
         { $sort: { _hd_next: -1 } },
-        {
-          $project: {
-            _id: 1,
-            case_title: 1,
-            court_name: 1,
-            'hearing_details.time': 1,
-            'hearing_details.next_hearing_date': '$_hd_next'
-          }
-        },
+        { $project: { _id: 1, case_title: 1, court_name: 1, 'hearing_details.time': 1, 'hearing_details.next_hearing_date': '$_hd_next' } },
         { $limit: 1 }
       ]);
     }
-
     const nearest_case = nearestCaseDoc[0] || null;
 
-    // Normalize news images (presign only if needed)
+    // Normalize news and pick only required fields
     const news = await Promise.all(
       (rawNews || []).map(async (n) => {
         const rawImg = pickRawImage(n);
         const image = await toAwsCompatibleUrl(rawImg);
-        return { ...n, image };
+        return {
+          title: n.title,
+          category: n.category,
+          source: n.source,
+          createdAt: n.createdAt,
+          image
+        };
       })
     );
 
