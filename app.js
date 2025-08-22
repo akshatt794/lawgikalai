@@ -21,33 +21,47 @@ const subscriptionRoutes = require('./routes/subscription');
 const courtRoutes = require('./routes/courts');
 const testDocumentDbRoute = require('./routes/test-documentdb');
 const aiDraftingRoutes = require('./routes/aiDrafting');
+const notificationsRoutes = require('./routes/notifications');
 
 const app = express();
 
 /* ================== MIDDLEWARE ================== */
 
+// If behind a proxy/load balancer (ALB/Nginx), this helps cookies work correctly
+app.set('trust proxy', 1);
+
 // CORS
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://lawgikalai-admin.netlify.app',
-  ],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [
+      'http://localhost:5173',
+      'https://lawgikalai-admin.netlify.app',
+    ],
+    credentials: true,
+  })
+);
 
 // Body + cookies
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
+// Ensure uploads directory exists so static serving is reliable
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads', { recursive: true });
+}
+
 // Serve uploads as static
-app.use('/uploads', express.static('uploads', {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.pdf')) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline');
-    }
-  }
-}));
+app.use(
+  '/uploads',
+  express.static('uploads', {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.pdf')) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline');
+      }
+    },
+  })
+);
 
 /* ================== ROUTES ================== */
 
@@ -57,13 +71,12 @@ app.use('/api/explore', exploreCourtRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/case', caseRoutes);
 app.use('/api/documents', documentRoutes);
-app.use('/api/orders', ordersRoutes);
+app.use('/api/orders', ordersRoutes);           // ✅ keep only this
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/ai', aiDraftingRoutes);
 app.use('/api/explore/courts', courtRoutes);
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api', ordersRoutes); // (you had this duplicate mount; keeping as-is)
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/test', testDocumentDbRoute);
 
 // Health / base
@@ -81,17 +94,15 @@ const DOCUMENTDB_URI = process.env.DOCUMENTDB_URI;
 // Use the CA bundle you downloaded to ~/aws
 const TLS_CA_FILE = '/home/ubuntu/aws/rds-combined-ca-bundle.pem';
 
-// Honor env port, default 4000 so we avoid conflicts with anything stuck on 3000
+// Honor env port, default 4000 (change to 3000 if your infra expects 3000)
 const PORT = Number(process.env.PORT) || 4000;
 
 async function start() {
   try {
     await mongoose.connect(DOCUMENTDB_URI, {
-      tlsCAFile: TLS_CA_FILE,         // ✅ correct CA file
+      tlsCAFile: TLS_CA_FILE,
       serverSelectionTimeoutMS: 15000,
       socketTimeoutMS: 45000,
-      // ❗ Do NOT include deprecated options in Mongoose v6+:
-      // useNewUrlParser / useUnifiedTopology are ignored and emit warnings
     });
     console.log('✅ Connected to DocumentDB');
 
@@ -100,7 +111,7 @@ async function start() {
     });
   } catch (err) {
     console.error('❌ DocumentDB connection error:', err);
-    process.exit(1); // fail fast so PM2 restarts after you fix networking/URI
+    process.exit(1);
   }
 }
 
