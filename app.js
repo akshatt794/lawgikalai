@@ -5,6 +5,12 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
+function sanitizeUri(u = '') {
+  return u.replace(/^\uFEFF/, '').trim().replace(/^['"]|['"]$/g, '');
+}
+
+let uri = sanitizeUri(process.env.DOCUMENTDB_URI || '');
+
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
