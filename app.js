@@ -23,14 +23,18 @@ const testDocumentDbRoute = require('./routes/test-documentdb');
 const aiDraftingRoutes = require('./routes/aiDrafting');
 const notificationsRoutes = require('./routes/notifications');
 
+// 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
+const ddcRoutes = require('./routes/ddc');          // <-- add this
+
+// 🚀 NEW: VC details API (judge name/room/link table)
+const courtVCRoutes = require('./routes/courtvc');  // <-- add this
+
 const app = express();
 
 /* ================== MIDDLEWARE ================== */
 
-// If behind a proxy/load balancer (ALB/Nginx), this helps cookies work correctly
 app.set('trust proxy', 1);
 
-// CORS
 app.use(
   cors({
     origin: [
@@ -41,16 +45,15 @@ app.use(
   })
 );
 
-// Body + cookies
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
-// Ensure uploads directory exists so static serving is reliable
+// Ensure uploads directory exists
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads', { recursive: true });
 }
 
-// Serve uploads as static
+// Serve uploads (PDFs inline)
 app.use(
   '/uploads',
   express.static('uploads', {
@@ -79,6 +82,10 @@ app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/test', testDocumentDbRoute);
 
+// 🔌 NEW mounts
+app.use('/api/ddc', ddcRoutes);                // UI structure + upload + search over PDFs
+app.use('/api/court-vc', courtVCRoutes);       // VC table CRUD/search
+
 // Health / base
 app.get('/', (_req, res) => {
   res.send('Welcome to Lawgikalai Auth API! 🚀');
@@ -86,24 +93,38 @@ app.get('/', (_req, res) => {
 
 /* ================== DATABASE CONNECT & SERVER START ================== */
 
-// Make mongoose fail fast instead of buffering queries for 10s
 mongoose.set('bufferCommands', false);
 mongoose.set('bufferTimeoutMS', 0);
 
-const DOCUMENTDB_URI = process.env.DOCUMENTDB_URI;
-// Use the CA bundle you downloaded to ~/aws
-const TLS_CA_FILE = '/home/ubuntu/aws/rds-combined-ca-bundle.pem';
+const DOCUMENTDB_URI = process.env.DOCUMENTDB_URI || process.env.MONGODB_URI;
 
-// Honor env port, default 4000 (change to 3000 if your infra expects 3000)
+const caFromEnv = process.env.DOCDB_CA;
+const caPath = caFromEnv
+  ? (path.isAbsolute(caFromEnv) ? caFromEnv : path.resolve(process.cwd(), caFromEnv))
+  : null;
+
+const mongoOpts = {
+  retryWrites: false,
+  tls: true,
+  serverSelectionTimeoutMS: 15000,
+  socketTimeoutMS: 45000,
+};
+
+if (caPath && fs.existsSync(caPath)) {
+  mongoOpts.tlsCAFile = caPath;
+} else {
+  console.warn('⚠️  DOCDB_CA not found or not set. TLS is enabled without custom CA.');
+  if (caPath) console.warn('   Expected at:', caPath);
+}
+
 const PORT = Number(process.env.PORT) || 4000;
 
 async function start() {
   try {
-    await mongoose.connect(DOCUMENTDB_URI, {
-      tlsCAFile: TLS_CA_FILE,
-      serverSelectionTimeoutMS: 15000,
-      socketTimeoutMS: 45000,
-    });
+    if (!DOCUMENTDB_URI) {
+      throw new Error('DOCUMENTDB_URI (or MONGODB_URI) is not set.');
+    }
+    await mongoose.connect(DOCUMENTDB_URI, mongoOpts);
     console.log('✅ Connected to DocumentDB');
 
     app.listen(PORT, '0.0.0.0', () => {
