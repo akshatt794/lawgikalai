@@ -95,17 +95,18 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
 });
 
 // ✅ Upload PDF (S3) & Index Content
+// ✅ Upload PDF (S3) & Index Content (Mongo + OpenSearch); response unchanged
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
 
-    const parsed = await pdfParse(req.file.buffer);
+    // Upload to S3
     const key = `documents/${crypto.randomUUID()}_${req.file.originalname.replace(/\s+/g, '_')}`;
-
     await uploadToS3(req.file.buffer, key, 'application/pdf');
-
     const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
+    // Parse and save to Mongo
+    const parsed = await pdfParse(req.file.buffer);
     const doc = new PdfDocument({
       title: req.file.originalname,
       file_url: fileUrl,
@@ -113,7 +114,24 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
     });
     await doc.save();
 
-    res.json({
+    // Index to OpenSearch so the message remains truthful and /search finds it
+    await osClient.index({
+      index: 'orders',
+      id: doc._id.toString(),
+      body: {
+        title: doc.title,
+        file_name: req.file.originalname,
+        file_url: fileUrl,
+        content: parsed.text,
+        createdAt: doc.createdAt,
+        uploaded_by: req.user?.id || 'anonymous',
+        uploaded_at: new Date().toISOString()
+      },
+      refresh: true
+    });
+
+    // ⬇️ Response kept EXACTLY the same as before
+    return res.json({
       message: 'PDF uploaded and indexed successfully!',
       document: {
         title: doc.title,
@@ -121,9 +139,8 @@ router.post('/upload-pdf', upload.single('document'), async (req, res) => {
         uploaded_at: doc.uploaded_at
       }
     });
-
   } catch (err) {
-    console.error('❌ Upload error:', err);
+    console.error('❌ Upload error (/upload-pdf):', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
