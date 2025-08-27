@@ -14,8 +14,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_OPTIONS = {
   httpOnly: true,
   // For cross-site frontends (different domain/port), 'none' is required & must be secure
-  sameSite: process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
-  secure: process.env.NODE_ENV === 'production', // requires HTTPS in prod
+  sameSite: 'lax',
+  secure: false, // requires HTTPS in prod
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
@@ -69,11 +69,26 @@ router.post('/signup', async (req, res) => {
   try {
     const { fullName, identifier, password, mobileNumber } = req.body;
     if (!fullName || !identifier || !password || !mobileNumber) {
+      // unchanged
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    const existing = await User.findOne({ identifier });
-    if (existing) return res.status(409).json({ error: 'User already exists' });
+    // 1) Check mobile number first
+    const existingMobile = await User.findOne({ mobileNumber });
+    if (existingMobile) {
+      // same shape (key "error"), clearer message
+      return res.status(409).json({ error: 'User with this mobile number already exists' });
+    }
+
+    // 2) Check identifier (could be email or username)
+    const existingIdentifier = await User.findOne({ identifier });
+    if (existingIdentifier) {
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+      return res.status(409).json({
+        // same shape (key "error"), clearer message
+        error: `User with this ${isEmail ? 'email' : 'identifier'} already exists`
+      });
+    }
 
     const hash = await bcrypt.hash(password, 10);
     const user = new User({ fullName, identifier, password: hash, mobileNumber });
@@ -85,6 +100,7 @@ router.post('/signup', async (req, res) => {
 
     console.log(`OTP for ${identifier}: ${otp}`);
 
+    // success response UNCHANGED
     res.json({
       message: "Signup successful. OTP sent to email.",
       user_id: user._id,
@@ -93,9 +109,11 @@ router.post('/signup', async (req, res) => {
     });
   } catch (err) {
     console.error('Signup error:', err);
+    // unchanged
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // FORGOT PASSWORD
 router.post('/forgot-password', async (req, res) => {
