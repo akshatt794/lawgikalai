@@ -15,15 +15,19 @@ router.post("/draft", async (req, res) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // or "gpt-3.5-turbo" if gpt-4 is not available
+      model: "gpt-4o mini", // or gpt-4/gpt-4o if enabled
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
     });
 
     const draft = completion.choices[0].message.content;
-    res.json({ draft });
+
+    res.json({
+      message: "Prompt generated successfully ✅",
+      draft,
+    });
   } catch (error) {
-    console.error("OpenAI Error:", error); // ← Add this for debugging
+    console.error("OpenAI Error:", error);
     res.status(500).json({ error: "Failed to generate legal draft" });
   }
 });
