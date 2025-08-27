@@ -15,7 +15,7 @@ router.post("/draft", async (req, res) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o mini", // or gpt-4/gpt-4o if enabled
+      model: "gpt-4o-mini", // or gpt-4/gpt-4o if enabled
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
     });
