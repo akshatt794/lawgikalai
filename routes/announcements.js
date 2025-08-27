@@ -64,5 +64,20 @@ router.post('/add', auth, async (req, res) => {
       res.status(500).json({ error: 'Server error', details: err.message });
     }
 });
+// GET announcements by search term (param)
+router.get('/search/:term?', async (req, res) => {
+  try {
+    const { term } = req.params;
+    const query = term
+      ? { title: { $regex: term, $options: 'i' } }
+      : {};
+
+    const announcements = await Announcement.find(query).sort({ createdAt: -1 });
+    res.json({ message: 'Announcements fetched', data: announcements });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
   
 module.exports = router;
