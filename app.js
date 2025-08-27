@@ -87,6 +87,7 @@ app.use('/api/ai', aiDraftingRoutes);
 app.use('/api/explore/courts', courtRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/test', testDocumentDbRoute);
+app.use('/api/courts', require('./routes/causeList'));
 
 // 🔌 NEW mounts
 app.use('/api/ddc', ddcRoutes);                // UI structure + upload + search over PDFs
