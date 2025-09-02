@@ -39,21 +39,27 @@ const app = express();
 
 /* ================== MIDDLEWARE ================== */
 
+const allowedOrigins = [
+  'http://localhost:5174',
+  'https://lawgikalai-admin.netlify.app'
+];
+
 const corsOptions = {
-  origin: [
-    'http://localhost:5174',
-    'https://lawgikalai-admin.netlify.app'
-  ],
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow REST tools like Postman
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Handle preflight requests globally
-app.options('*', cors(corsOptions));
-
-// Apply CORS to all routes
-app.use(cors(corsOptions));
+app.use(cors(corsOptions));  // Apply globally
+app.options('*', cors(corsOptions)); // Preflight requests
 
 app.set('trust proxy', 1);
 
