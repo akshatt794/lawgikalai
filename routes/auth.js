@@ -47,7 +47,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
 
     // ✅ Set cookie (response body unchanged)
-    res.cookie('token', token, COOKIE_OPTIONS);
+    // res.cookie('token', token, COOKIE_OPTIONS);
 
     res.json({
       message: "Login successful.",

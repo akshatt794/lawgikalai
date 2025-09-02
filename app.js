@@ -39,27 +39,27 @@ const app = express();
 
 /* ================== MIDDLEWARE ================== */
 
-const allowedOrigins = [
-  'http://localhost:5174',
-  'https://lawgikalai-admin.netlify.app'
-];
+// const allowedOrigins = [
+//   'http://localhost:5174',
+//   'https://lawgikalai-admin.netlify.app'
+// ];
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow REST tools like Postman
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
+// const corsOptions = {
+//   origin: function (origin, callback) {
+//     if (!origin) return callback(null, true); // allow REST tools like Postman
+//     if (allowedOrigins.indexOf(origin) !== -1) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error('Not allowed by CORS'));
+//     }
+//   },
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+// };
 
-app.use(cors(corsOptions));  // Apply globally
-app.options('*', cors(corsOptions)); // Preflight requests
+// app.use(cors(corsOptions));  // Apply globally
+// app.options('*', cors(corsOptions)); // Preflight requests
 
 app.set('trust proxy', 1);
 

@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 
+const generateToken = (userData) => {
+    return jwt.sign(userData, process.env.JWT_SECRET, { expiresIn: 21600 }); // 6 hours
+}
+
 const verifyToken = (req, res, next) => {
   // 1️⃣ Try from cookie first
   const token = req.cookies?.token 
@@ -22,4 +26,5 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-module.exports = verifyToken;
+
+module.exports = {verifyToken, generateToken};
