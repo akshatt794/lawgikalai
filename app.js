@@ -39,17 +39,21 @@ const app = express();
 
 /* ================== MIDDLEWARE ================== */
 
-app.set('trust proxy', 1);
-
 app.use(
   cors({
     origin: [
-      'http://localhost:5173',
+      'http://localhost:5174',
       'https://lawgikalai-admin.netlify.app',
     ],
     credentials: true,
+      methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+
   })
 );
+
+app.set('trust proxy', 1);
+
 
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
