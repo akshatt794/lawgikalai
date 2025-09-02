@@ -39,18 +39,21 @@ const app = express();
 
 /* ================== MIDDLEWARE ================== */
 
-app.use(
-  cors({
-    origin: [
-      'http://localhost:5174',
-      'https://lawgikalai-admin.netlify.app',
-    ],
-    credentials: true,
-      methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+const corsOptions = {
+  origin: [
+    'http://localhost:5174',
+    'https://lawgikalai-admin.netlify.app'
+  ],
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
+};
 
-  })
-);
+// Handle preflight requests globally
+app.options('*', cors(corsOptions));
+
+// Apply CORS to all routes
+app.use(cors(corsOptions));
 
 app.set('trust proxy', 1);
 

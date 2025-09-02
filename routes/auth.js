@@ -14,7 +14,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_OPTIONS = {
   httpOnly: true,
   // For cross-site frontends (different domain/port), 'none' is required & must be secure
-  sameSite: 'lax',
+  sameSite: 'none',
   secure: false, // requires HTTPS in prod
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
@@ -22,6 +22,7 @@ const COOKIE_OPTIONS = {
 
 const auth = (req, res, next) => {
   const header = req.headers.authorization;
+  console.log(header)
   if (!header) return res.status(401).json({ error: 'Missing token' });
 
   const token = header.split(' ')[1];
