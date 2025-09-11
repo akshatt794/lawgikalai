@@ -34,20 +34,22 @@ const auth = (req, res, next) => {
   }
 };
 
-// LOGIN
+//LOGIN
 router.post('/login', async (req, res) => {
   try {
     const { identifier, password } = req.body;
     const user = await User.findOne({ identifier });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(401).json({ error: 'Account not verified. Please check your OTP.' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
-
-    // ✅ Set cookie (response body unchanged)
-    // res.cookie('token', token, COOKIE_OPTIONS);
 
     res.json({
       message: "Login successful.",
@@ -64,6 +66,39 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
+
+
+// // LOGIN
+// router.post('/login', async (req, res) => {
+//   try {
+//     const { identifier, password } = req.body;
+//     const user = await User.findOne({ identifier });
+//     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+
+//     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+
+//     // ✅ Set cookie (response body unchanged)
+//     // res.cookie('token', token, COOKIE_OPTIONS);
+
+//     res.json({
+//       message: "Login successful.",
+//       token,
+//       user: {
+//         id: user._id,
+//         name: user.fullName,
+//         email: user.identifier,
+//         mobileNumber: user.mobileNumber
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Login error:', err);
+//     res.status(500).json({ error: 'Server error', details: err.message });
+//   }
+// });
 
 // SIGNUP
 router.post('/signup', async (req, res) => {
