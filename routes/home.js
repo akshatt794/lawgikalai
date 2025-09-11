@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const Announcement = require('../models/Announcement');
 const Case = require('../models/Case');
 const News = require('../models/News');
-const verifyToken = require('../middleware/verifyToken');
+const {verifyToken} = require('../middleware/verifyToken');
 
 // ===== AWS (optional presign) =====
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-south-1';
