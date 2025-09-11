@@ -264,22 +264,33 @@ router.put('/change-password', verifyToken, async (req, res) => {
 router.post('/verify-otp', async (req, res) => {
   try {
     const { user_id, otp } = req.body;
-
-    if (otp !== '123456') {
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    console.log(req.body);
+    if (!user_id || !otp) {
+      return res.status(409).json({ error: 'User ID and OTP are required' });
     }
 
     const user = await User.findById(user_id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    if (user.isVerified) {
+      return res.json({ message: 'User already verified.' });
+    }
+
+    if (user.otp !== otp) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+
+    if (user.otpExpires < Date.now()) {
+      return res.status(400).json({ error: 'OTP expired' });
+    }
+
+    // Mark user as verified
+    user.isVerified = true;
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
-
-    // ✅ Set cookie (response body unchanged)
-    res.cookie('token', token, COOKIE_OPTIONS);
 
     res.json({
       message: "OTP verified successfully.",
@@ -296,6 +307,7 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 // RESEND OTP
 router.post('/resend-otp', async (req, res) => {
