@@ -90,7 +90,7 @@ router.post('/signup', async (req, res) => {
         existingUser.fullName = fullName;
         existingUser.identifier = identifier;
         await existingUser.save();
-        sendCodeByEmail(otp);
+        sendCodeByEmail(identifier, otp);
         console.log(`Resent OTP for ${identifier}: ${otp}`);
 
         return res.json({
@@ -119,7 +119,7 @@ router.post('/signup', async (req, res) => {
         existingUser.fullName = fullName;
         existingUser.mobileNumber = mobileNumber;
         await existingUser.save();
-        sendCodeByEmail(otp);
+        sendCodeByEmail(identifier, otp);
         console.log(`Resent OTP for ${identifier}: ${otp}`);
 
         return res.json({
