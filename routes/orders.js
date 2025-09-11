@@ -94,8 +94,8 @@ router.post('/upload-document', upload.single('document'), async (req, res) => {
   }
 });
 
-// ✅ Upload PDF (S3) & Index Content
-// ✅ Upload PDF (S3) & Index Content (Mongo + OpenSearch); response unchanged
+// Upload PDF (S3) & Index Content
+// Upload PDF (S3) & Index Content (Mongo + OpenSearch); response unchanged
 router.post('/upload-pdf', upload.single('document'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No document uploaded' });

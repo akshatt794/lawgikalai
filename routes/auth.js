@@ -1,5 +1,5 @@
 require('dotenv').config();
-
+const { generateOtp, sendCodeByEmail } = require("../utils/emailservice");
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -70,38 +70,76 @@ router.post('/signup', async (req, res) => {
   try {
     const { fullName, identifier, password, mobileNumber } = req.body;
     if (!fullName || !identifier || !password || !mobileNumber) {
-      // unchanged
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // 1) Check mobile number first
-    const existingMobile = await User.findOne({ mobileNumber });
-    if (existingMobile) {
-      // same shape (key "error"), clearer message
-      return res.status(409).json({ error: 'User with this mobile number already exists' });
-    }
-
-    // 2) Check identifier (could be email or username)
-    const existingIdentifier = await User.findOne({ identifier });
-    if (existingIdentifier) {
-      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
-      return res.status(409).json({
-        // same shape (key "error"), clearer message
-        error: `User with this ${isEmail ? 'email' : 'identifier'} already exists`
-      });
-    }
-
+    // Hash password early
     const hash = await bcrypt.hash(password, 10);
-    const user = new User({ fullName, identifier, password: hash, mobileNumber });
 
-    const otp = '123456';
+    // 1) Check by mobile number
+    let existingUser = await User.findOne({ mobileNumber });
+    if (existingUser) {
+      if (existingUser.isVerified) {
+        return res.status(409).json({ error: 'User with this mobile number already exists' });
+      } else {
+        // user exists but not verified → resend OTP
+        const otp = generateOtp();
+        existingUser.otp = otp;
+        existingUser.otpExpires = Date.now() + 10 * 60 * 1000;
+        existingUser.password = hash; // update password if re-trying
+        existingUser.fullName = fullName;
+        existingUser.identifier = identifier;
+        await existingUser.save();
+        sendCodeByEmail(otp);
+        console.log(`Resent OTP for ${identifier}: ${otp}`);
+
+        return res.json({
+          message: "Signup successful. OTP sent to email.",
+          user_id: existingUser._id,
+          mobileNumber: existingUser.mobileNumber,
+          requires_verification: true
+        });
+      }
+    }
+
+    // 2) Check by identifier
+    existingUser = await User.findOne({ identifier });
+    if (existingUser) {
+      if (existingUser.isVerified) {
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+        return res.status(409).json({
+          error: `User with this ${isEmail ? 'email' : 'identifier'} already exists`
+        });
+      } else {
+        // user exists but not verified → resend OTP
+        const otp = generateOtp();
+        existingUser.otp = otp;
+        existingUser.otpExpires = Date.now() + 10 * 60 * 1000;
+        existingUser.password = hash; // update password if re-trying
+        existingUser.fullName = fullName;
+        existingUser.mobileNumber = mobileNumber;
+        await existingUser.save();
+        sendCodeByEmail(otp);
+        console.log(`Resent OTP for ${identifier}: ${otp}`);
+
+        return res.json({
+          message: "Signup successful. OTP sent to email.",
+          user_id: existingUser._id,
+          mobileNumber: existingUser.mobileNumber,
+          requires_verification: true
+        });
+      }
+    }
+
+    // 3) If no existing user → create new one
+    const user = new User({ fullName, identifier, password: hash, mobileNumber });
+    const otp = generateOtp();
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
     console.log(`OTP for ${identifier}: ${otp}`);
 
-    // success response UNCHANGED
     res.json({
       message: "Signup successful. OTP sent to email.",
       user_id: user._id,
@@ -110,10 +148,10 @@ router.post('/signup', async (req, res) => {
     });
   } catch (err) {
     console.error('Signup error:', err);
-    // unchanged
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 
 
 // FORGOT PASSWORD

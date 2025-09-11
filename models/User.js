@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   password: String,
   otp: String,
   otpExpires: Date,
+  isVerified: { type: Boolean, default: false },
   savedNews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'News' }] // <--- Add this line
 });
 

@@ -14,7 +14,7 @@ export default function Login() {
     setMsg("");
     try {
       const res = await axios.post(
-        `${API_URL}/api/auth/login`,
+        `http://13.126.80.135:3000/api/auth/login`,
         { identifier, password }
       );
       localStorage.setItem("token", res.data.token);
