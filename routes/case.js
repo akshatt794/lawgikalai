@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Case = require('../models/Case');
-const verifyToken = require('../middleware/verifyToken');
+const {verifyToken} = require('../middleware/verifyToken');
 const jwt = require('jsonwebtoken'); // required for legacy fallback
 
 // ✅ Utility to generate case_id

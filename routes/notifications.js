@@ -4,7 +4,7 @@ const router = express.Router();
 const admin = require('../utils/firebase');
 const User = require('../models/User'); // Make sure this has 'fcmToken' field
 const Notification = require('../models/Notification');
-const verifyToken = require('../middleware/verifyToken');
+const {verifyToken} = require('../middleware/verifyToken');
 
 // ✅ Save FCM token for the logged-in user
 router.post('/save-token', verifyToken, async (req, res) => {
