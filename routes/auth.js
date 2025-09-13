@@ -143,7 +143,7 @@ router.post('/signup', async (req, res) => {
     sendCodeByEmail(identifier, otp);
     console.log(`OTP for ${identifier}: ${otp}`);
 
-    res.json({
+    return res.json({
       message: "Signup successful. OTP sent to email.",
       user_id: user._id,
       mobileNumber: user.mobileNumber,
