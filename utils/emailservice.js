@@ -34,11 +34,11 @@ const sendCodeByEmail = (email, otp) => {
     });
 
     transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            // console.log(error);
-        } else {
-            // console.log('Email sent: ' + info.response);
-        }
+    if (error) {
+        console.error("OTP email failed:", error);
+    } else {
+        console.log("OTP email sent:", info.response);
+    }
     });
 }
 

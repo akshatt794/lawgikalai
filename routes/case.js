@@ -38,11 +38,12 @@ router.get('/list', verifyToken, async (req, res) => {
   try {
     const { status, page = 1, limit = 10, search = '' } = req.query;
     const query = {
-      userId: req.user.userId,
+      userId: new mongoose.Types.ObjectId(req.user.userId)
     };
 
-    if (status === 'ongoing') query.case_status = 'Ongoing';
-    else if (status === 'closed') query.case_status = 'Closed';
+    if (status) {
+      query.case_status = { $regex: `^${status}$`, $options: 'i' };
+    }
 
     if (search) {
       query.case_title = { $regex: search, $options: 'i' }; // 🔍 case-insensitive title match

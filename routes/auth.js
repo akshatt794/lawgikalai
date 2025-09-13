@@ -67,39 +67,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-
-
-// // LOGIN
-// router.post('/login', async (req, res) => {
-//   try {
-//     const { identifier, password } = req.body;
-//     const user = await User.findOne({ identifier });
-//     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-
-//     const isMatch = await bcrypt.compare(password, user.password);
-//     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
-
-//     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
-
-//     // ✅ Set cookie (response body unchanged)
-//     // res.cookie('token', token, COOKIE_OPTIONS);
-
-//     res.json({
-//       message: "Login successful.",
-//       token,
-//       user: {
-//         id: user._id,
-//         name: user.fullName,
-//         email: user.identifier,
-//         mobileNumber: user.mobileNumber
-//       }
-//     });
-//   } catch (err) {
-//     console.error('Login error:', err);
-//     res.status(500).json({ error: 'Server error', details: err.message });
-//   }
-// });
-
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
@@ -126,7 +93,7 @@ router.post('/signup', async (req, res) => {
         existingUser.identifier = identifier;
         await existingUser.save();
         sendCodeByEmail(identifier, otp);
-        console.log(`Resent OTP for ${identifier}: ${otp}`);
+        // console.log(`Resent OTP for ${identifier}: ${otp}`);
 
         return res.json({
           message: "Signup successful. OTP sent to email.",
@@ -155,7 +122,7 @@ router.post('/signup', async (req, res) => {
         existingUser.mobileNumber = mobileNumber;
         await existingUser.save();
         sendCodeByEmail(identifier, otp);
-        console.log(`Resent OTP for ${identifier}: ${otp}`);
+        // console.log(`Resent OTP for ${identifier}: ${otp}`);
 
         return res.json({
           message: "Signup successful. OTP sent to email.",
@@ -168,11 +135,12 @@ router.post('/signup', async (req, res) => {
 
     // 3) If no existing user → create new one
     const user = new User({ fullName, identifier, password: hash, mobileNumber });
+    console.log("Please help "+identifier);
     const otp = generateOtp();
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
-
+    sendCodeByEmail(identifier, otp);
     console.log(`OTP for ${identifier}: ${otp}`);
 
     res.json({
@@ -266,7 +234,7 @@ router.post('/verify-otp', async (req, res) => {
     const { user_id, otp } = req.body;
     console.log(req.body);
     if (!user_id || !otp) {
-      return res.status(409).json({ error: 'User ID and OTP are required' });
+      return res.status(400).json({ error: 'User ID and OTP are required' });
     }
 
     const user = await User.findById(user_id);

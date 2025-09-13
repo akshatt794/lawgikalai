@@ -31,7 +31,7 @@ This is a simple Node.js + Express + MongoDB based Authentication API with:
 
 ### 1. Sign Up
 
-- **POST** `/api/auth/signup`
+- **POST** ``
 - **Body:**
     ```json
     {

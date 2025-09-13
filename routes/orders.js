@@ -9,6 +9,7 @@ const path = require('path');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 const PdfDocument = require('../models/PdfDocument');
+const {verifyToken} = require('../middleware/verifyToken');
 
 // ✅ OpenSearch PDF Indexing Helper
 async function parseAndIndexPDF(fileBuffer, metadata) {
@@ -77,7 +78,7 @@ router.post('/upload', upload.single('order'), async (req, res) => {
 });
 
 // ✅ Upload Single PDF (Cloudinary)
-router.post('/upload-document', upload.single('document'), async (req, res) => {
+router.post('/upload-document', verifyToken, upload.single('document'), async (req, res) => {
   try {
     const cloudinary = require('../config/cloudinary');
     const result = await cloudinary.uploader.upload(req.file.path, {
