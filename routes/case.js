@@ -3,6 +3,7 @@ const router = express.Router();
 const Case = require('../models/Case');
 const {verifyToken} = require('../middleware/verifyToken');
 const jwt = require('jsonwebtoken'); // required for legacy fallback
+const mongoose = require("mongoose");
 
 // ✅ Utility to generate case_id
 function generateCaseId() {
