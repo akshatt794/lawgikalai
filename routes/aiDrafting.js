@@ -6,6 +6,27 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Helper function to try GPT-5, fall back to GPT-4o-mini if unavailable
+async function safeCompletion(messages) {
+  try {
+    return await openai.chat.completions.create({
+      model: "gpt-5",
+      messages,
+      temperature: 0.7,
+    });
+  } catch (err) {
+    if (err.error?.message?.includes("does not exist")) {
+      console.warn("⚠️ gpt-5 not available, falling back to gpt-4o-mini");
+      return await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+        temperature: 0.7,
+      });
+    }
+    throw err;
+  }
+}
+
 router.post("/draft", async (req, res) => {
   const { prompt } = req.body;
 
@@ -14,17 +35,16 @@ router.post("/draft", async (req, res) => {
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // or gpt-4/gpt-4o if enabled
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    });
+    const completion = await safeCompletion([
+      { role: "user", content: prompt },
+    ]);
 
     const draft = completion.choices[0].message.content;
 
     res.json({
       message: "Prompt generated successfully ✅",
       draft,
+      model: completion.model, // useful to see which model was actually used
     });
   } catch (error) {
     console.error("OpenAI Error:", error);

@@ -245,4 +245,30 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
+
+router.get("/policies/:type", (req, res) => {
+  const { type } = req.params; // comes as string
+
+  const policies = {
+    0: {
+      title: "Terms and Conditions",
+      content: "These are the terms and conditions of our service..."
+    },
+    1: {
+      title: "Privacy Policy",
+      content: "This is the privacy policy explaining how we handle data..."
+    },
+    2: {
+      title: "Refund Policy",
+      content: "This is the refund policy describing how refunds are processed..."
+    }
+  };
+
+  if (type in policies) {
+    return res.json(policies[type]);
+  } else {
+    return res.status(400).json({ error: "Invalid type parameter. Use 0,1,2" });
+  }
+});
+
 module.exports = router;
