@@ -17,7 +17,7 @@ router.post("/draft", async (req, res) => {
     const completion = await openai.chat.completions.create({
       model: "gpt-5", // or gpt-4/gpt-4o if enabled
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
+      // temperature: 0.7, //not supported by gpt 5
     });
 
     const draft = completion.choices[0].message.content;
