@@ -47,9 +47,11 @@ router.post("/draft", async (req, res) => {
       model: completion.model, // useful to see which model was actually used
     });
   } catch (error) {
-    console.error("OpenAI Error:", error);
-    res.status(500).json({ error: "Failed to generate legal draft" });
-  }
+  console.error("OpenAI Error:", JSON.stringify(error, null, 2));
+  res.status(500).json({
+    error: error.error?.message || error.message || "Failed to generate legal draft",
+  });
+}
 });
 
 module.exports = router;
