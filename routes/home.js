@@ -365,6 +365,10 @@ At LawgicalAi, we strive to provide a reliable and valuable service for legal pr
 If you have any questions about this Refund Policy, please contact us at:  
 **support@lawgicalai.com**
   `
+    }, 
+    3:{
+      title: "High Court Calender",
+      content: "https://lawgikalai-bucket.s3.ap-south-1.amazonaws.com/documents/high-court-calender.jpg"
     }
 
   };
