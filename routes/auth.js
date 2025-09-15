@@ -208,6 +208,24 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
+router.post('/confirm-password', verifyToken, async (req, res) => {
+  try {
+    const { newPassword, token } = req.body;
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedNewPassword;
+    await user.save();
+
+    res.json({ message: 'Password changed successfully', token });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message, token });
+  }
+});
+
 // router.post('/forgot-password', async (req, res) => {
 //   try {
 //     const { identifier } = req.body;
@@ -299,9 +317,9 @@ router.post('/verify-otp', async (req, res) => {
     const user = await User.findById(user_id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (user.isVerified) {
-      return res.json({ message: 'User already verified.' });
-    }
+    // if (user.isVerified) {
+    //   return res.json({ message: 'User already verified.' });
+    // }
 
     if (user.otp !== otp) {
       return res.status(400).json({ error: 'Invalid OTP' });
