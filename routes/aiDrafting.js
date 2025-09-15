@@ -23,7 +23,7 @@ router.post("/draft", async (req, res) => {
     const draft = completion.choices[0].message.content;
 
     res.json({
-      message: "Prompt generated successfully ✅",
+      message: "Prompt generated successfully",
       draft,
     });
   } catch (error) {

@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const Announcement = require('../models/Announcement');
 const Case = require('../models/Case');
 const News = require('../models/News');
-const {verifyToken} = require('../middleware/verifyToken');
+const { verifyToken } = require('../middleware/verifyToken');
 
 // ===== AWS (optional presign) =====
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-south-1';
@@ -252,16 +252,121 @@ router.get("/policies/:type", (req, res) => {
   const policies = {
     0: {
       title: "Terms and Conditions",
-      content: "These are the terms and conditions of our service..."
+      content: `Welcome to LawgicalAi. By accessing or using our application, you agree to the following Terms and Conditions:
+
+1. **Use of Service**  
+   LawgicalAi is designed to help legal professionals manage and organize client case data. You agree to use the platform only for lawful purposes and in compliance with all applicable laws and regulations.
+
+2. **User Responsibilities**  
+   - You are solely responsible for the accuracy, completeness, and legality of the information you upload.  
+   - You must ensure that you have obtained all necessary consents from your clients before storing or processing their information.  
+   - You agree not to use the app to upload unlawful, harmful, or unauthorized content.  
+
+3. **Data Ownership and Confidentiality**  
+   - All data you input remains your property.  
+   - LawgicalAi will not access, disclose, or share your case data except as required by law or with your consent.  
+   - You are responsible for maintaining appropriate confidentiality with respect to your clients.  
+
+4. **Disclaimer**  
+   LawgicalAi does not provide legal advice. The app is a productivity tool and should not be considered a substitute for professional judgment or legal counsel.  
+
+5. **Account and Security**  
+   - You are responsible for safeguarding your account credentials.  
+   - LawgicalAi is not liable for unauthorized access resulting from your failure to secure your account.  
+
+6. **Limitation of Liability**  
+   To the maximum extent permitted by law, LawgicalAi and its operators are not liable for any damages, losses, or consequences arising from the use of the platform, including but not limited to data loss or unauthorized access.  
+
+7. **Termination**  
+   We reserve the right to suspend or terminate accounts that violate these Terms.  
+
+8. **Changes to Terms**  
+   LawgicalAi may update these Terms from time to time. Continued use of the app after such updates constitutes acceptance of the revised Terms.  
+
+If you do not agree with these Terms, please discontinue using the application immediately.
+  `
     },
     1: {
       title: "Privacy Policy",
-      content: "This is the privacy policy explaining how we handle data..."
+      content: `
+At LawgicalAi, we respect your privacy and are committed to protecting the confidentiality of your information. This Privacy Policy explains how we collect, use, and safeguard your data.
+
+1. **Information We Collect**  
+   - **Account Information**: Name, email address, and login credentials.  
+   - **Case Data**: Information you voluntarily upload regarding client cases.  
+   - **Technical Data**: Device information, IP address, and usage logs for security and performance.  
+
+2. **How We Use Your Information**  
+   - To provide and improve our services.  
+   - To ensure security, authentication, and account management.  
+   - To comply with legal obligations when required.  
+   - We do **not** sell, rent, or share your personal or case data with third parties for marketing purposes.  
+
+3. **Data Confidentiality**  
+   - All case data remains your property.  
+   - We treat uploaded case data as strictly confidential and will not access or disclose it except:  
+     (a) with your consent, or  
+     (b) when legally required.  
+
+4. **Data Security**  
+   - We use industry-standard encryption and security measures to protect your data.  
+   - However, no system is completely secure, and we cannot guarantee absolute security.  
+
+5. **Third-Party Services**  
+   - We may use trusted third-party providers (such as cloud hosting or email services) to support our operations.  
+   - These providers are contractually obligated to maintain the confidentiality and security of your data.  
+
+6. **Your Rights**  
+   - You have the right to access, correct, or delete your personal information stored with us.  
+   - You may request account deletion at any time, subject to applicable law.  
+
+7. **Data Retention**  
+   - We retain case data only as long as necessary to provide services or comply with legal obligations.  
+   - Deleted case data is permanently removed from our systems within a reasonable timeframe.  
+
+8. **Changes to Privacy Policy**  
+   We may update this Privacy Policy from time to time. Continued use of LawgicalAi constitutes acceptance of the revised policy.  
+
+9. **Contact Us**  
+   If you have questions or concerns about this Privacy Policy, please contact us at:  
+   **support@lawgikalai.com**
+  `
     },
+
     2: {
       title: "Refund Policy",
-      content: "This is the refund policy describing how refunds are processed..."
+      content: `
+At LawgicalAi, we strive to provide a reliable and valuable service for legal professionals. This Refund Policy explains when and how refunds are processed.
+
+1. **Subscription Plans**  
+   - Payments for subscription plans (monthly, yearly, or otherwise) are non-refundable once the billing cycle begins.  
+   - If you cancel your subscription, you will continue to have access until the end of your paid billing period, after which no further charges will apply.  
+
+2. **One-Time Purchases**  
+   - Payments for one-time services or features are generally non-refundable unless otherwise stated at the time of purchase.  
+
+3. **Exceptional Refunds**  
+   Refunds may be granted under the following circumstances:  
+   - Duplicate or accidental charges.  
+   - Proven technical issues that prevent you from using the service, where we are unable to resolve the issue.  
+   - Legal requirements that mandate a refund.  
+
+4. **Refund Request Process**  
+   - To request a refund, please contact our support team at **support@lawgicalai.com** within **7 days** of the transaction.  
+   - All requests will be reviewed, and approved refunds will be processed back to the original payment method within **7–14 business days**.  
+
+5. **Free Trials and Promotional Offers**  
+   - If a free trial is offered, you will not be charged until the trial period ends.  
+   - Once converted into a paid subscription, normal refund rules apply.  
+
+6. **Changes to Refund Policy**  
+   LawgicalAi reserves the right to update this Refund Policy from time to time. Any changes will be communicated through the app or website.  
+
+If you have any questions about this Refund Policy, please contact us at:  
+**support@lawgicalai.com**
+  `
     }
+
   };
 
   if (type in policies) {
