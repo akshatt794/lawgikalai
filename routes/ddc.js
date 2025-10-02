@@ -268,7 +268,7 @@ router.get('/testing', async (req, res) => {
   try {
     // Example: fetch query param
     const query = req.query.q || '';
-    
+    console.log('Received query:', query);
     // For testing, return a dummy response
     const response = {
       ok: true,
