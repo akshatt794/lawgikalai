@@ -264,6 +264,29 @@ router.post('/docs/upload', upload.single('file'), async (req, res) => {
  * Query: q=vinod+yadav&complex=ROHINI&zone=NORTH%20WEST&category=JUDGES_LIST
  * Returns highlight snippets and doc info.
  */
+router.get('/testing', async (req, res) => {
+  try {
+    // Example: fetch query param
+    const query = req.query.q || '';
+    
+    // For testing, return a dummy response
+    const response = {
+      ok: true,
+      message: 'Search API working',
+      queryReceived: query,
+      results: [
+        { id: 1, title: 'Test result 1' },
+        { id: 2, title: 'Test result 2' }
+      ]
+    };
+
+    res.status(200).json(response);
+  } catch (err) {
+    console.error('Search API error:', err);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
 router.get('/search', async (req, res) => {
   try {
     const { q, complex, zone, category, size } = req.query;
