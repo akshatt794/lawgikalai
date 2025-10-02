@@ -193,6 +193,7 @@ router.get('/docs/:id', async (req, res) => {
 router.post('/docs/upload', upload.single('file'), async (req, res) => {
   try {
     const body = { ...req.body };
+    console.log('Upload body:', body);
     if (body.docDate) body.docDate = new Date(body.docDate);
 
     const { value, error } = upsertSchema.validate({ ...body, remoteUrl: req.body.remoteUrl });
