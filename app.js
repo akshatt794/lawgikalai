@@ -30,7 +30,7 @@ const ordersRoutes = require("./routes/orders");
 const announcementRoutes = require("./routes/announcements");
 const subscriptionRoutes = require("./routes/subscription");
 const courtRoutes = require("./routes/courts");
-const testDocumentDbRoute = require("./routes/test-documentdb");
+const testDocumentDbRoute = require("./routes/test-documentdb.js");
 const aiDraftingRoutes = require("./routes/aiDrafting");
 const notificationsRoutes = require("./routes/notifications");
 
@@ -106,7 +106,7 @@ app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/ai", aiDraftingRoutes);
 app.use("/api/explore/courts", courtRoutes);
 app.use("/api/notifications", notificationsRoutes);
-app.use("/api/test", testDocumentDbRoute);
+// app.use("/api/test", testDocumentDbRoute);
 // Changed here the route handling
 app.use("/api/courts", causeListRoute);
 
