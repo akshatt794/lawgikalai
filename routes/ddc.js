@@ -258,12 +258,10 @@ router.post("/docs/upload", upload.single("file"), async (req, res) => {
             return res.status(400).json({ ok: false, error: error.message });
 
         if (!fitsZone(value.complex, value.zone)) {
-            return res
-                .status(400)
-                .json({
-                    ok: false,
-                    error: `${value.zone} is not a valid zone for ${value.complex}`,
-                });
+            return res.status(400).json({
+                ok: false,
+                error: `${value.zone} is not a valid zone for ${value.complex}`,
+            });
         }
 
         // 1) get PDF buffer
@@ -399,39 +397,37 @@ router.post("/docs/upload", upload.single("file"), async (req, res) => {
 
 router.get("/search", async (req, res) => {
     try {
-        const { complex, zone, category, categoryList, size } = req.query;
+        const { complex, zone, category, size } = req.query;
 
-        // Build filters
-        const filters = {};
-        if (complex) filters.complex = complex;
-        if (zone) filters.zone = zone;
-
-        // handle category or categoryList (comma-separated string or array)
-        let categories = [];
-        if (categoryList) {
-            categories = Array.isArray(categoryList)
-                ? categoryList
-                : categoryList
-                      .split(",")
-                      .map((c) => c.trim())
-                      .filter(Boolean);
-        } else if (category) {
-            categories = [category];
-        }
-
-        if (categories.length > 0) {
-            filters.category = { $in: categories };
-        }
-
-        // --- Prefer OpenSearch if configured ---
-        if (OS_URL) {
-            const data = await osSearch(null, {
-                complex,
-                zone,
-                categoryList: categories,
-                size: Number(size) || 50,
+        // At least one filter must be provided
+        if (!complex && !zone && !category) {
+            return res.status(400).json({
+                ok: false,
+                error: "At least one filter (complex, zone, or category) is required",
             });
+        }
 
+        // Prefer OpenSearch if present
+        if (OS_URL) {
+            const must = [];
+            if (complex) must.push({ term: { complex } });
+            if (zone) must.push({ term: { zone } });
+            if (category) must.push({ term: { category } });
+
+            const url = `${OS_URL.replace(/\/$/, "")}/${OS_INDEX}/_search`;
+            const headers = { "Content-Type": "application/json" };
+            if (OS_AUTH) {
+                headers["Authorization"] =
+                    "Basic " + Buffer.from(OS_AUTH).toString("base64");
+            }
+
+            const body = {
+                query: { bool: { must } },
+                size: Number(size) || 20,
+                sort: [{ docDate: { order: "desc" } }], // Sort by date since no relevance score
+            };
+
+            const { data } = await axios.post(url, body, { headers });
             const hits = (data?.hits?.hits || []).map((h) => ({
                 id: h._id,
                 score: h._score,
@@ -442,12 +438,16 @@ router.get("/search", async (req, res) => {
                 docDate: h._source.docDate,
                 s3Url: h._source.s3Url,
             }));
-
             return res.json({ ok: true, engine: "opensearch", hits });
         }
 
-        // --- MongoDB fallback ---
-        const rows = await DdcDoc.find(filters)
+        // Mongo fallback
+        const filter = {};
+        if (complex) filter.complex = complex;
+        if (zone) filter.zone = zone;
+        if (category) filter.category = category;
+
+        const rows = await DdcDoc.find(filter)
             .select({
                 complex: 1,
                 zone: 1,
@@ -456,12 +456,13 @@ router.get("/search", async (req, res) => {
                 docDate: 1,
                 s3Url: 1,
             })
-            .sort({ docDate: -1 })
-            .limit(Number(size) || 50)
+            .sort({ docDate: -1 }) // Sort by date
+            .limit(Number(size) || 20)
             .lean();
 
         const hits = rows.map((r) => ({
             id: String(r._id),
+            score: null, // No relevance score for filter-only queries
             complex: r.complex,
             zone: r.zone,
             category: r.category,
