@@ -53,6 +53,7 @@ async function osIndexDoc(id, body) {
 }
 
 async function osSearch(q, filter) {
+    console.log(">>> osSearch called with:", q, opts);
     if (!OS_URL) return null;
     const url = `${OS_URL.replace(/\/$/, "")}/${OS_INDEX}/_search`;
     const headers = { "Content-Type": "application/json" };
@@ -341,7 +342,9 @@ router.get("/text-search", async (req, res) => {
     try {
         const { q, complex, zone, category, size } = req.query;
         if (!q)
-            return res.status(400).json({ ok: false, error: "q is required, text-search" });
+            return res
+                .status(400)
+                .json({ ok: false, error: "q is required, text-search" });
 
         // Prefer OpenSearch if present
         if (OS_URL) {
@@ -515,7 +518,10 @@ router.get("/search", async (req, res) => {
 router.get("/lookup", async (req, res) => {
     console.log("=== LOOKUP ENDPOINT HIT ===");
     const { q } = req.query;
-    if (!q) return res.status(400).json({ ok: false, error: "q is required - lookup" });
+    if (!q)
+        return res
+            .status(400)
+            .json({ ok: false, error: "q is required - lookup" });
 
     req.query.size = req.query.size || 10;
     const results = [];
