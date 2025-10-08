@@ -233,224 +233,6 @@ router.get("/docs", async (req, res) => {
 });
 
 /**
- * /search - Filter by complex/zone/category only (no text search)
-  /text-search - Full text search with optional filters
-  /lookup - Wrapper around /text-search
- */
-
-// TEXT SEARCH endpoint - search with query text
-router.get("/text-search", async (req, res) => {
-    try {
-        const { q, complex, zone, category, size } = req.query;
-        if (!q)
-            return res
-                .status(400)
-                .json({ ok: false, error: "q is required, text-search" });
-
-        // Prefer OpenSearch if present
-        if (OS_URL) {
-            const data = await osSearch(q, {
-                complex,
-                zone,
-                category,
-                size: Number(size) || 20,
-            });
-            const hits = (data?.hits?.hits || []).map((h) => ({
-                id: h._id,
-                score: h._score,
-                complex: h._source.complex,
-                zone: h._source.zone,
-                category: h._source.category,
-                title: h._source.title,
-                docDate: h._source.docDate,
-                s3Url: h._source.s3Url,
-                highlights: h.highlight?.fullText || [],
-            }));
-            return res.json({ ok: true, engine: "opensearch", hits });
-        }
-
-        // Mongo text fallback
-        const filter = {};
-        if (complex) filter.complex = complex;
-        if (zone) filter.zone = zone;
-        if (category) filter.category = category;
-
-        const rows = await DdcDoc.find({ $text: { $search: q }, ...filter })
-            .select({
-                score: { $meta: "textScore" },
-                complex: 1,
-                zone: 1,
-                category: 1,
-                title: 1,
-                docDate: 1,
-                s3Url: 1,
-                fullText: 1,
-            })
-            .sort({ score: { $meta: "textScore" } })
-            .limit(Number(size) || 20)
-            .lean();
-
-        // basic highlights
-        const rgx = new RegExp(
-            `(.{0,70})(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(.{0,70})`,
-            "i"
-        );
-        const hits = rows.map((r) => {
-            const m = r.fullText?.match(rgx);
-            const snippet = m
-                ? `${m[1]}${m[2]}${m[3]}`
-                : (r.fullText || "").slice(0, 140);
-            return {
-                id: String(r._id),
-                score: r.score,
-                complex: r.complex,
-                zone: r.zone,
-                category: r.category,
-                title: r.title,
-                docDate: r.docDate,
-                s3Url: r.s3Url,
-                highlights: [snippet],
-            };
-        });
-
-        res.json({ ok: true, engine: "mongo", hits });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ ok: false, error: "Server error" });
-    }
-});
-
-// SEARCH endpoint - filter only (no text search)
-router.get("/search", async (req, res) => {
-    console.log("=== SEARCH ENDPOINT HIT ===");
-    console.log("Query params:", req.query);
-
-    try {
-        const { q, complex, zone, category, size } = req.query;
-
-        // Explicitly reject if 'q' is present
-        if (q) {
-            return res.status(400).json({
-                ok: false,
-                error: 'This endpoint does not accept "q" parameter. Use /text-search or /lookup for text queries.',
-            });
-        }
-
-        // At least one filter must be provided
-        if (!complex && !zone && !category) {
-            return res.status(400).json({
-                ok: false,
-                error: "At least one filter (complex, zone, or category) is required",
-            });
-        }
-
-        // Prefer OpenSearch if present
-        if (OS_URL) {
-            const must = [];
-            if (complex) must.push({ term: { complex } });
-            if (zone) must.push({ term: { zone } });
-            if (category) must.push({ term: { category } });
-
-            const url = `${OS_URL.replace(/\/$/, "")}/${OS_INDEX}/_search`;
-            const headers = { "Content-Type": "application/json" };
-            if (OS_AUTH) {
-                headers["Authorization"] =
-                    "Basic " + Buffer.from(OS_AUTH).toString("base64");
-            }
-
-            const body = {
-                query: { bool: { must } },
-                size: Number(size) || 20,
-                sort: [{ docDate: { order: "desc" } }],
-            };
-
-            const { data } = await axios.post(url, body, { headers });
-            const hits = (data?.hits?.hits || []).map((h) => ({
-                id: h._id,
-                score: h._score,
-                complex: h._source.complex,
-                zone: h._source.zone,
-                category: h._source.category,
-                title: h._source.title,
-                docDate: h._source.docDate,
-                s3Url: h._source.s3Url,
-            }));
-            return res.json({ ok: true, engine: "opensearch", hits });
-        }
-
-        // Mongo fallback
-        const filter = {};
-        if (complex) filter.complex = complex;
-        if (zone) filter.zone = zone;
-        if (category) filter.category = category;
-
-        const rows = await DdcDoc.find(filter)
-            .select({
-                complex: 1,
-                zone: 1,
-                category: 1,
-                title: 1,
-                docDate: 1,
-                s3Url: 1,
-            })
-            .sort({ docDate: -1 })
-            .limit(Number(size) || 20)
-            .lean();
-
-        const hits = rows.map((r) => ({
-            id: String(r._id),
-            score: null,
-            complex: r.complex,
-            zone: r.zone,
-            category: r.category,
-            title: r.title,
-            docDate: r.docDate,
-            s3Url: r.s3Url,
-        }));
-
-        res.json({ ok: true, engine: "mongo", hits });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ ok: false, error: "Server error" });
-    }
-});
-
-// LOOKUP endpoint - calls text-search
-router.get("/lookup", async (req, res) => {
-    console.log("=== LOOKUP ENDPOINT HIT ===");
-    const { q } = req.query;
-    if (!q)
-        return res
-            .status(400)
-            .json({ ok: false, error: "q is required - lookup" });
-
-    req.query.size = req.query.size || 10;
-    const results = [];
-    try {
-        const { data } = await axios.get(
-            `${req.protocol}://${req.get("host")}${req.baseUrl}/text-search`,
-            { params: req.query }
-        );
-        for (const hit of data.hits || []) {
-            results.push({
-                id: hit.id,
-                complex: hit.complex,
-                zone: hit.zone,
-                category: hit.category,
-                title: hit.title,
-                docDate: hit.docDate,
-                s3Url: hit.s3Url,
-                highlight: hit.highlights?.[0] || "",
-            });
-        }
-        res.json({ ok: true, results });
-    } catch (err) {
-        console.error("Lookup error:", err.message);
-        res.json({ ok: false, error: "lookup failed", details: err.message });
-    }
-});
-
-/**
  * GET /api/ddc/docs/:id  (returns meta + pages if you want)
  */
 router.get("/docs/:id", async (req, res) => {
@@ -549,6 +331,126 @@ router.post("/docs/upload", upload.single("file"), async (req, res) => {
     } catch (e) {
         console.error("upload error", e);
         res.status(500).json({ ok: false, error: "Server error" });
+    }
+});
+
+/**
+ * GET /api/ddc/search
+ * Query: q=vinod+yadav&complex=ROHINI&zone=NORTH%20WEST&category=JUDGES_LIST
+ * Returns highlight snippets and doc info.
+ */
+router.get("/search", async (req, res) => {
+    try {
+        const { q, complex, zone, category, size } = req.query;
+        if (!q)
+            return res.status(400).json({ ok: false, error: "q is required" });
+
+        // Prefer OpenSearch if present
+        if (OS_URL) {
+            const data = await osSearch(q, {
+                complex,
+                zone,
+                category,
+                size: Number(size) || 20,
+            });
+            const hits = (data?.hits?.hits || []).map((h) => ({
+                id: h._id,
+                score: h._score,
+                complex: h._source.complex,
+                zone: h._source.zone,
+                category: h._source.category,
+                title: h._source.title,
+                docDate: h._source.docDate,
+                s3Url: h._source.s3Url,
+                highlights: h.highlight?.fullText || [],
+            }));
+            return res.json({ ok: true, engine: "opensearch", hits });
+        }
+
+        // Mongo text fallback
+        const filter = {};
+        if (complex) filter.complex = complex;
+        if (zone) filter.zone = zone;
+        if (category) filter.category = category;
+
+        const rows = await DdcDoc.find({ $text: { $search: q }, ...filter })
+            .select({
+                score: { $meta: "textScore" },
+                complex: 1,
+                zone: 1,
+                category: 1,
+                title: 1,
+                docDate: 1,
+                s3Url: 1,
+                fullText: 1,
+            })
+            .sort({ score: { $meta: "textScore" } })
+            .limit(Number(size) || 20)
+            .lean();
+
+        // basic highlights
+        const rgx = new RegExp(
+            `(.{0,70})(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(.{0,70})`,
+            "i"
+        );
+        const hits = rows.map((r) => {
+            const m = r.fullText?.match(rgx);
+            const snippet = m
+                ? `${m[1]}${m[2]}${m[3]}`
+                : (r.fullText || "").slice(0, 140);
+            return {
+                id: String(r._id),
+                score: r.score,
+                complex: r.complex,
+                zone: r.zone,
+                category: r.category,
+                title: r.title,
+                docDate: r.docDate,
+                s3Url: r.s3Url,
+                highlights: [snippet],
+            };
+        });
+
+        res.json({ ok: true, engine: "mongo", hits });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ ok: false, error: "Server error" });
+    }
+});
+
+/**
+ * Quick lookup specialized for your search box:
+ * GET /api/ddc/lookup?q=vinod%20yadav or /api/ddc/lookup?q=Room%20205
+ * Optional: complex/zone/category filters.
+ */
+router.get("/lookup", async (req, res) => {
+    const { q } = req.query;
+    if (!q) return res.status(400).json({ ok: false, error: "q is required" });
+
+    // delegate to /search but keep response minimal
+    req.query.size = req.query.size || 10;
+    const results = [];
+    const original = res.json.bind(res);
+    try {
+        const { data } = await axios.get(
+            `${req.protocol}://${req.get("host")}${req.baseUrl}/search`,
+            { params: req.query }
+        );
+        for (const hit of data.hits || []) {
+            results.push({
+                id: hit.id,
+                complex: hit.complex,
+                zone: hit.zone,
+                category: hit.category,
+                title: hit.title,
+                docDate: hit.docDate,
+                s3Url: hit.s3Url,
+                highlight: hit.highlights?.[0] || "",
+            });
+        }
+        original({ ok: true, results });
+    } catch {
+        original({ ok: false, error: "lookup failed" });
     }
 });
 
