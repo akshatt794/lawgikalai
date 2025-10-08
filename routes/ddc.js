@@ -465,28 +465,54 @@ const s3 = new AWS.S3({
 // GET /api/ddc/bail-roster-files
 router.get("/bail", async (req, res) => {
     try {
+        console.log("🔍 [DEBUG] /bail route called");
+
         const params = {
             Bucket: "lawgikalai-bucket",
             Prefix: "bareacts/", // folder inside the bucket
         };
 
+        console.log("📦 [DEBUG] S3 listObjectsV2 params:", params);
+
         const data = await s3.listObjectsV2(params).promise();
+        console.log(
+            "📂 [DEBUG] S3 response received. Total objects:",
+            data.Contents ? data.Contents.length : 0
+        );
+
+        if (!data.Contents || data.Contents.length === 0) {
+            console.warn(
+                "⚠️ [DEBUG] No files found in S3 under prefix:",
+                params.Prefix
+            );
+        }
 
         // Filter only PDF files that have "bail" or "roster" in the key
         const pdfFiles = (data.Contents || [])
-            .filter(
-                (obj) =>
-                    obj.Key.toLowerCase().includes("bail") &&
-                    obj.Key.toLowerCase().endsWith(".pdf")
-            )
-            .map((obj) => ({
-                key: obj.Key,
-                url: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`,
-            }));
+            .filter((obj) => {
+                const keyLower = obj.Key.toLowerCase();
+                const match =
+                    keyLower.includes("bail") && keyLower.endsWith(".pdf");
+                if (match) {
+                    console.log("✅ [DEBUG] Matching file:", obj.Key);
+                } else {
+                    console.log("🚫 [DEBUG] Skipped file:", obj.Key);
+                }
+                return match;
+            })
+            .map((obj) => {
+                const url = `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`;
+                return { key: obj.Key, url };
+            });
+
+        console.log(
+            "📊 [DEBUG] Final filtered PDF list count:",
+            pdfFiles.length
+        );
 
         return res.json({ ok: true, result: pdfFiles });
     } catch (err) {
-        console.error("Error fetching Bail Roster PDFs:", err);
+        console.error("❌ [ERROR] Error fetching Bail Roster PDFs:", err);
         return res.status(500).json({ ok: false, error: "Server error" });
     }
 });
