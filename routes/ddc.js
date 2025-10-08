@@ -53,7 +53,7 @@ async function osIndexDoc(id, body) {
 }
 
 async function osSearch(q, filter) {
-    console.log(">>> osSearch called with:", q, opts);
+    console.log(">>> osSearch called with:", q, filter);
     if (!OS_URL) return null;
     const url = `${OS_URL.replace(/\/$/, "")}/${OS_INDEX}/_search`;
     const headers = { "Content-Type": "application/json" };
