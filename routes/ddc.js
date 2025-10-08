@@ -341,7 +341,7 @@ router.get("/text-search", async (req, res) => {
     try {
         const { q, complex, zone, category, size } = req.query;
         if (!q)
-            return res.status(400).json({ ok: false, error: "q is required" });
+            return res.status(400).json({ ok: false, error: "q is required, text-search" });
 
         // Prefer OpenSearch if present
         if (OS_URL) {
@@ -515,7 +515,7 @@ router.get("/search", async (req, res) => {
 router.get("/lookup", async (req, res) => {
     console.log("=== LOOKUP ENDPOINT HIT ===");
     const { q } = req.query;
-    if (!q) return res.status(400).json({ ok: false, error: "q is required" });
+    if (!q) return res.status(400).json({ ok: false, error: "q is required - lookup" });
 
     req.query.size = req.query.size || 10;
     const results = [];
