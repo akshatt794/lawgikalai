@@ -463,32 +463,36 @@ const s3 = new AWS.S3({
 });
 
 // GET /api/ddc/bail-roster-files
+// router.get("/bail-roster-files", async (req, res) => {
+//     try {
+//         const params = {
+//             Bucket: "lawgikalai-bucket",
+//             Prefix: "bareacts/", // folder inside the bucket
+//         };
+
+//         const data = await s3.listObjectsV2(params).promise();
+
+//         // Filter only PDF files that have "bail" or "roster" in the key
+//         const pdfFiles = (data.Contents || [])
+//             .filter(
+//                 (obj) =>
+//                     obj.Key.toLowerCase().includes("bail") &&
+//                     obj.Key.toLowerCase().endsWith(".pdf")
+//             )
+//             .map((obj) => ({
+//                 key: obj.Key,
+//                 url: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`,
+//             }));
+
+//         res.json({ ok: true, result: pdfFiles });
+//     } catch (err) {
+//         console.error("Error fetching Bail Roster PDFs:", err);
+//         res.status(500).json({ ok: false, error: "Server error" });
+//     }
+// });
+
 router.get("/bail-roster-files", async (req, res) => {
-    try {
-        const params = {
-            Bucket: "lawgikalai-bucket",
-            Prefix: "bareacts/", // folder inside the bucket
-        };
-
-        const data = await s3.listObjectsV2(params).promise();
-
-        // Filter only PDF files that have "bail" or "roster" in the key
-        const pdfFiles = (data.Contents || [])
-            .filter(
-                (obj) =>
-                    obj.Key.toLowerCase().includes("bail") &&
-                    obj.Key.toLowerCase().endsWith(".pdf")
-            )
-            .map((obj) => ({
-                key: obj.Key,
-                url: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`,
-            }));
-
-        res.json({ ok: true, result: pdfFiles });
-    } catch (err) {
-        console.error("Error fetching Bail Roster PDFs:", err);
-        res.status(500).json({ ok: false, error: "Server error" });
-    }
+    res.json({ ok: true });
 });
 
 module.exports = router;
