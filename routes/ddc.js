@@ -437,90 +437,6 @@ router.post("/docs/upload", upload.single("file"), async (req, res) => {
   /lookup - Wrapper around /text-search
  */
 
-// SEARCH endpoint - filter only (no text search)
-router.get("/search", async (req, res) => {
-    try {
-        const { complex, zone, category, size } = req.query;
-
-        // At least one filter must be provided
-        if (!complex && !zone && !category) {
-            return res.status(400).json({
-                ok: false,
-                error: "At least one filter (complex, zone, or category) is required",
-            });
-        }
-
-        // Prefer OpenSearch if present
-        if (OS_URL) {
-            const must = [];
-            if (complex) must.push({ term: { complex } });
-            if (zone) must.push({ term: { zone } });
-            if (category) must.push({ term: { category } });
-
-            const url = `${OS_URL.replace(/\/$/, "")}/${OS_INDEX}/_search`;
-            const headers = { "Content-Type": "application/json" };
-            if (OS_AUTH) {
-                headers["Authorization"] =
-                    "Basic " + Buffer.from(OS_AUTH).toString("base64");
-            }
-
-            const body = {
-                query: { bool: { must } },
-                size: Number(size) || 20,
-                sort: [{ docDate: { order: "desc" } }],
-            };
-
-            const { data } = await axios.post(url, body, { headers });
-            const hits = (data?.hits?.hits || []).map((h) => ({
-                id: h._id,
-                score: h._score,
-                complex: h._source.complex,
-                zone: h._source.zone,
-                category: h._source.category,
-                title: h._source.title,
-                docDate: h._source.docDate,
-                s3Url: h._source.s3Url,
-            }));
-            return res.json({ ok: true, engine: "opensearch", hits });
-        }
-
-        // Mongo fallback
-        const filter = {};
-        if (complex) filter.complex = complex;
-        if (zone) filter.zone = zone;
-        if (category) filter.category = category;
-
-        const rows = await DdcDoc.find(filter)
-            .select({
-                complex: 1,
-                zone: 1,
-                category: 1,
-                title: 1,
-                docDate: 1,
-                s3Url: 1,
-            })
-            .sort({ docDate: -1 })
-            .limit(Number(size) || 20)
-            .lean();
-
-        const hits = rows.map((r) => ({
-            id: String(r._id),
-            score: null,
-            complex: r.complex,
-            zone: r.zone,
-            category: r.category,
-            title: r.title,
-            docDate: r.docDate,
-            s3Url: r.s3Url,
-        }));
-
-        res.json({ ok: true, engine: "mongo", hits });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ ok: false, error: "Server error" });
-    }
-});
-
 // TEXT SEARCH endpoint - search with query text
 router.get("/text-search", async (req, res) => {
     try {
@@ -601,8 +517,104 @@ router.get("/text-search", async (req, res) => {
     }
 });
 
+// SEARCH endpoint - filter only (no text search)
+router.get("/search", async (req, res) => {
+    console.log("=== SEARCH ENDPOINT HIT ===");
+    console.log("Query params:", req.query);
+
+    try {
+        const { q, complex, zone, category, size } = req.query;
+
+        // Explicitly reject if 'q' is present
+        if (q) {
+            return res.status(400).json({
+                ok: false,
+                error: 'This endpoint does not accept "q" parameter. Use /text-search or /lookup for text queries.',
+            });
+        }
+
+        // At least one filter must be provided
+        if (!complex && !zone && !category) {
+            return res.status(400).json({
+                ok: false,
+                error: "At least one filter (complex, zone, or category) is required",
+            });
+        }
+
+        // Prefer OpenSearch if present
+        if (OS_URL) {
+            const must = [];
+            if (complex) must.push({ term: { complex } });
+            if (zone) must.push({ term: { zone } });
+            if (category) must.push({ term: { category } });
+
+            const url = `${OS_URL.replace(/\/$/, "")}/${OS_INDEX}/_search`;
+            const headers = { "Content-Type": "application/json" };
+            if (OS_AUTH) {
+                headers["Authorization"] =
+                    "Basic " + Buffer.from(OS_AUTH).toString("base64");
+            }
+
+            const body = {
+                query: { bool: { must } },
+                size: Number(size) || 20,
+                sort: [{ docDate: { order: "desc" } }],
+            };
+
+            const { data } = await axios.post(url, body, { headers });
+            const hits = (data?.hits?.hits || []).map((h) => ({
+                id: h._id,
+                score: h._score,
+                complex: h._source.complex,
+                zone: h._source.zone,
+                category: h._source.category,
+                title: h._source.title,
+                docDate: h._source.docDate,
+                s3Url: h._source.s3Url,
+            }));
+            return res.json({ ok: true, engine: "opensearch", hits });
+        }
+
+        // Mongo fallback
+        const filter = {};
+        if (complex) filter.complex = complex;
+        if (zone) filter.zone = zone;
+        if (category) filter.category = category;
+
+        const rows = await DdcDoc.find(filter)
+            .select({
+                complex: 1,
+                zone: 1,
+                category: 1,
+                title: 1,
+                docDate: 1,
+                s3Url: 1,
+            })
+            .sort({ docDate: -1 })
+            .limit(Number(size) || 20)
+            .lean();
+
+        const hits = rows.map((r) => ({
+            id: String(r._id),
+            score: null,
+            complex: r.complex,
+            zone: r.zone,
+            category: r.category,
+            title: r.title,
+            docDate: r.docDate,
+            s3Url: r.s3Url,
+        }));
+
+        res.json({ ok: true, engine: "mongo", hits });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ ok: false, error: "Server error" });
+    }
+});
+
 // LOOKUP endpoint - calls text-search
 router.get("/lookup", async (req, res) => {
+    console.log("=== LOOKUP ENDPOINT HIT ===");
     const { q } = req.query;
     if (!q) return res.status(400).json({ ok: false, error: "q is required" });
 
@@ -627,9 +639,9 @@ router.get("/lookup", async (req, res) => {
         }
         res.json({ ok: true, results });
     } catch (err) {
-        res.json({ ok: false, error: "lookup failed" });
+        console.error("Lookup error:", err.message);
+        res.json({ ok: false, error: "lookup failed", details: err.message });
     }
 });
 
 module.exports = router;
-
