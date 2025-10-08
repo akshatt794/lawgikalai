@@ -34,8 +34,6 @@ const testDocumentDbRoute = require("./routes/test-documentdb");
 const aiDraftingRoutes = require("./routes/aiDrafting");
 const notificationsRoutes = require("./routes/notifications");
 
-// judges route
-const judgeRoute = require("./routes/judge");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
@@ -112,7 +110,6 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/test", testDocumentDbRoute);
 // Changed here the route handling
 app.use("/api/courts", causeListRoute);
-app.use("/api/judges", judgeRoute);
 
 // 🔌 NEW mounts
 app.use("/api/ddc", ddcRoutes); // UI structure + upload + search over PDFs
