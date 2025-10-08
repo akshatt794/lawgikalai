@@ -1,5 +1,8 @@
 // routes/ddc.js
 const express = require("express");
+console.log("██████████████████████████████████████████████████████");
+console.log("DDC ROUTES FILE LOADED - NEW VERSION WITH TEXT-SEARCH");
+console.log("██████████████████████████████████████████████████████");
 const router = express.Router();
 const DdcDoc = require("../models/DdcDoc");
 const Joi = require("joi");
