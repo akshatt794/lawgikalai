@@ -230,108 +230,6 @@ router.get("/docs", async (req, res) => {
 });
 
 /**
- * GET /api/ddc/docs/:id  (returns meta + pages if you want)
- */
-router.get("/docs/:id", async (req, res) => {
-    const row = await DdcDoc.findById(req.params.id).lean();
-    if (!row) return res.status(404).json({ ok: false, error: "Not found" });
-    res.json({ ok: true, result: row });
-});
-
-/**
- * POST /api/ddc/docs/upload
- * Accepts:
- *  - multipart file (field: file) OR
- *  - { remoteUrl } pointing to your S3/public PDF OR
- *  - { s3Url }
- * Body also needs: complex, zone, category, title?, docDate?, sourceUrl?, fileKey?
- */
-router.post("/docs/upload", upload.single("file"), async (req, res) => {
-    try {
-        const body = { ...req.body };
-        if (body.docDate) body.docDate = new Date(body.docDate);
-
-        const { value, error } = upsertSchema.validate({
-            ...body,
-            remoteUrl: req.body.remoteUrl,
-        });
-        if (error)
-            return res.status(400).json({ ok: false, error: error.message });
-
-        if (!fitsZone(value.complex, value.zone)) {
-            return res.status(400).json({
-                ok: false,
-                error: `${value.zone} is not a valid zone for ${value.complex}`,
-            });
-        }
-
-        // 1) get PDF buffer
-        let buf = null;
-        if (req.file?.buffer) buf = req.file.buffer;
-        else if (value.remoteUrl) {
-            const { data } = await axios.get(value.remoteUrl, {
-                responseType: "arraybuffer",
-            });
-            buf = Buffer.from(data);
-            if (!value.s3Url) value.s3Url = value.remoteUrl;
-        } else if (value.s3Url) {
-            const { data } = await axios.get(value.s3Url, {
-                responseType: "arraybuffer",
-            });
-            buf = Buffer.from(data);
-        } else {
-            return res
-                .status(400)
-                .json({ ok: false, error: "Provide file, remoteUrl or s3Url" });
-        }
-
-        // 2) parse PDF => fullText + pages[]
-        const { fullText, pages } = await parsePdfFromBuffer(buf);
-
-        // 3) upsert row
-        const payload = { ...value, fullText, pages };
-        const key = {
-            complex: value.complex,
-            zone: value.zone,
-            category: value.category,
-            title: value.title || null,
-            s3Url: value.s3Url || null,
-        };
-
-        let doc = await DdcDoc.findOneAndUpdate(
-            key,
-            { $set: payload },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-
-        // 4) optional OpenSearch
-        if (OS_URL) {
-            const osBody = {
-                complex: doc.complex,
-                zone: doc.zone,
-                category: doc.category,
-                title: doc.title,
-                docDate: doc.docDate,
-                s3Url: doc.s3Url,
-                sourceUrl: doc.sourceUrl,
-                fullText: doc.fullText,
-            };
-            const osRes = await osIndexDoc(String(doc._id), osBody);
-            if (osRes) {
-                doc.osIndex = osRes.index;
-                doc.osId = osRes.osId;
-                await doc.save();
-            }
-        }
-
-        res.status(201).json({ ok: true, result: doc });
-    } catch (e) {
-        console.error("upload error", e);
-        res.status(500).json({ ok: false, error: "Server error" });
-    }
-});
-
-/**
  * /search - Filter by complex/zone/category only (no text search)
   /text-search - Full text search with optional filters
   /lookup - Wrapper around /text-search
@@ -546,6 +444,108 @@ router.get("/lookup", async (req, res) => {
     } catch (err) {
         console.error("Lookup error:", err.message);
         res.json({ ok: false, error: "lookup failed", details: err.message });
+    }
+});
+
+/**
+ * GET /api/ddc/docs/:id  (returns meta + pages if you want)
+ */
+router.get("/docs/:id", async (req, res) => {
+    const row = await DdcDoc.findById(req.params.id).lean();
+    if (!row) return res.status(404).json({ ok: false, error: "Not found" });
+    res.json({ ok: true, result: row });
+});
+
+/**
+ * POST /api/ddc/docs/upload
+ * Accepts:
+ *  - multipart file (field: file) OR
+ *  - { remoteUrl } pointing to your S3/public PDF OR
+ *  - { s3Url }
+ * Body also needs: complex, zone, category, title?, docDate?, sourceUrl?, fileKey?
+ */
+router.post("/docs/upload", upload.single("file"), async (req, res) => {
+    try {
+        const body = { ...req.body };
+        if (body.docDate) body.docDate = new Date(body.docDate);
+
+        const { value, error } = upsertSchema.validate({
+            ...body,
+            remoteUrl: req.body.remoteUrl,
+        });
+        if (error)
+            return res.status(400).json({ ok: false, error: error.message });
+
+        if (!fitsZone(value.complex, value.zone)) {
+            return res.status(400).json({
+                ok: false,
+                error: `${value.zone} is not a valid zone for ${value.complex}`,
+            });
+        }
+
+        // 1) get PDF buffer
+        let buf = null;
+        if (req.file?.buffer) buf = req.file.buffer;
+        else if (value.remoteUrl) {
+            const { data } = await axios.get(value.remoteUrl, {
+                responseType: "arraybuffer",
+            });
+            buf = Buffer.from(data);
+            if (!value.s3Url) value.s3Url = value.remoteUrl;
+        } else if (value.s3Url) {
+            const { data } = await axios.get(value.s3Url, {
+                responseType: "arraybuffer",
+            });
+            buf = Buffer.from(data);
+        } else {
+            return res
+                .status(400)
+                .json({ ok: false, error: "Provide file, remoteUrl or s3Url" });
+        }
+
+        // 2) parse PDF => fullText + pages[]
+        const { fullText, pages } = await parsePdfFromBuffer(buf);
+
+        // 3) upsert row
+        const payload = { ...value, fullText, pages };
+        const key = {
+            complex: value.complex,
+            zone: value.zone,
+            category: value.category,
+            title: value.title || null,
+            s3Url: value.s3Url || null,
+        };
+
+        let doc = await DdcDoc.findOneAndUpdate(
+            key,
+            { $set: payload },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        // 4) optional OpenSearch
+        if (OS_URL) {
+            const osBody = {
+                complex: doc.complex,
+                zone: doc.zone,
+                category: doc.category,
+                title: doc.title,
+                docDate: doc.docDate,
+                s3Url: doc.s3Url,
+                sourceUrl: doc.sourceUrl,
+                fullText: doc.fullText,
+            };
+            const osRes = await osIndexDoc(String(doc._id), osBody);
+            if (osRes) {
+                doc.osIndex = osRes.index;
+                doc.osId = osRes.osId;
+                await doc.save();
+            }
+        }
+
+        res.status(201).json({ ok: true, result: doc });
+    } catch (e) {
+        console.error("upload error", e);
+        res.status(500).json({ ok: false, error: "Server error" });
     }
 });
 
