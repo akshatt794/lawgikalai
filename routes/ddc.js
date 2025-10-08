@@ -517,8 +517,6 @@ router.get("/bail", async (req, res) => {
     }
 });
 
-router.get("/tbl", async (req, res) => {
-    return res.status(200).json({ message: "Working" });
-});
+
 
 module.exports = router;
