@@ -395,6 +395,49 @@ router.post("/docs/upload", upload.single("file"), async (req, res) => {
 //   }
 // });
 
+/**
+ * Quick lookup specialized for your search box:
+ * GET /api/ddc/lookup?q=vinod%20yadav or /api/ddc/lookup?q=Room%20205
+ * Optional: complex/zone/category filters.
+ */
+// router.get("/lookup", async (req, res) => {
+//     const { q } = req.query;
+//     if (!q) return res.status(400).json({ ok: false, error: "q is required" });
+
+//     // delegate to /search but keep response minimal
+//     req.query.size = req.query.size || 10;
+//     const results = [];
+//     const original = res.json.bind(res);
+//     try {
+//         const { data } = await axios.get(
+//             `${req.protocol}://${req.get("host")}${req.baseUrl}/search`,
+//             { params: req.query }
+//         );
+//         for (const hit of data.hits || []) {
+//             results.push({
+//                 id: hit.id,
+//                 complex: hit.complex,
+//                 zone: hit.zone,
+//                 category: hit.category,
+//                 title: hit.title,
+//                 docDate: hit.docDate,
+//                 s3Url: hit.s3Url,
+//                 highlight: hit.highlights?.[0] || "",
+//             });
+//         }
+//         original({ ok: true, results });
+//     } catch {
+//         original({ ok: false, error: "lookup failed" });
+//     }
+// });
+
+/**
+ * /search - Filter by complex/zone/category only (no text search)
+  /text-search - Full text search with optional filters
+  /lookup - Wrapper around /text-search
+ */
+
+// SEARCH endpoint - filter only (no text search)
 router.get("/search", async (req, res) => {
     try {
         const { complex, zone, category, size } = req.query;
@@ -424,7 +467,7 @@ router.get("/search", async (req, res) => {
             const body = {
                 query: { bool: { must } },
                 size: Number(size) || 20,
-                sort: [{ docDate: { order: "desc" } }], // Sort by date since no relevance score
+                sort: [{ docDate: { order: "desc" } }],
             };
 
             const { data } = await axios.post(url, body, { headers });
@@ -456,13 +499,13 @@ router.get("/search", async (req, res) => {
                 docDate: 1,
                 s3Url: 1,
             })
-            .sort({ docDate: -1 }) // Sort by date
+            .sort({ docDate: -1 })
             .limit(Number(size) || 20)
             .lean();
 
         const hits = rows.map((r) => ({
             id: String(r._id),
-            score: null, // No relevance score for filter-only queries
+            score: null,
             complex: r.complex,
             zone: r.zone,
             category: r.category,
@@ -478,22 +521,96 @@ router.get("/search", async (req, res) => {
     }
 });
 
-/**
- * Quick lookup specialized for your search box:
- * GET /api/ddc/lookup?q=vinod%20yadav or /api/ddc/lookup?q=Room%20205
- * Optional: complex/zone/category filters.
- */
+// TEXT SEARCH endpoint - search with query text
+router.get("/text-search", async (req, res) => {
+    try {
+        const { q, complex, zone, category, size } = req.query;
+        if (!q)
+            return res.status(400).json({ ok: false, error: "q is required" });
+
+        // Prefer OpenSearch if present
+        if (OS_URL) {
+            const data = await osSearch(q, {
+                complex,
+                zone,
+                category,
+                size: Number(size) || 20,
+            });
+            const hits = (data?.hits?.hits || []).map((h) => ({
+                id: h._id,
+                score: h._score,
+                complex: h._source.complex,
+                zone: h._source.zone,
+                category: h._source.category,
+                title: h._source.title,
+                docDate: h._source.docDate,
+                s3Url: h._source.s3Url,
+                highlights: h.highlight?.fullText || [],
+            }));
+            return res.json({ ok: true, engine: "opensearch", hits });
+        }
+
+        // Mongo text fallback
+        const filter = {};
+        if (complex) filter.complex = complex;
+        if (zone) filter.zone = zone;
+        if (category) filter.category = category;
+
+        const rows = await DdcDoc.find({ $text: { $search: q }, ...filter })
+            .select({
+                score: { $meta: "textScore" },
+                complex: 1,
+                zone: 1,
+                category: 1,
+                title: 1,
+                docDate: 1,
+                s3Url: 1,
+                fullText: 1,
+            })
+            .sort({ score: { $meta: "textScore" } })
+            .limit(Number(size) || 20)
+            .lean();
+
+        // basic highlights
+        const rgx = new RegExp(
+            `(.{0,70})(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(.{0,70})`,
+            "i"
+        );
+        const hits = rows.map((r) => {
+            const m = r.fullText?.match(rgx);
+            const snippet = m
+                ? `${m[1]}${m[2]}${m[3]}`
+                : (r.fullText || "").slice(0, 140);
+            return {
+                id: String(r._id),
+                score: r.score,
+                complex: r.complex,
+                zone: r.zone,
+                category: r.category,
+                title: r.title,
+                docDate: r.docDate,
+                s3Url: r.s3Url,
+                highlights: [snippet],
+            };
+        });
+
+        res.json({ ok: true, engine: "mongo", hits });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ ok: false, error: "Server error" });
+    }
+});
+
+// LOOKUP endpoint - calls text-search
 router.get("/lookup", async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ ok: false, error: "q is required" });
 
-    // delegate to /search but keep response minimal
     req.query.size = req.query.size || 10;
     const results = [];
-    const original = res.json.bind(res);
     try {
         const { data } = await axios.get(
-            `${req.protocol}://${req.get("host")}${req.baseUrl}/search`,
+            `${req.protocol}://${req.get("host")}${req.baseUrl}/text-search`,
             { params: req.query }
         );
         for (const hit of data.hits || []) {
@@ -508,10 +625,11 @@ router.get("/lookup", async (req, res) => {
                 highlight: hit.highlights?.[0] || "",
             });
         }
-        original({ ok: true, results });
-    } catch {
-        original({ ok: false, error: "lookup failed" });
+        res.json({ ok: true, results });
+    } catch (err) {
+        res.json({ ok: false, error: "lookup failed" });
     }
 });
 
 module.exports = router;
+
