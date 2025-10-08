@@ -1,8 +1,5 @@
 // routes/ddc.js
 const express = require("express");
-console.log("██████████████████████████████████████████████████████");
-console.log("DDC ROUTES FILE LOADED - NEW VERSION WITH TEXT-SEARCH");
-console.log("██████████████████████████████████████████████████████");
 const router = express.Router();
 const DdcDoc = require("../models/DdcDoc");
 const Joi = require("joi");
@@ -451,6 +448,46 @@ router.get("/lookup", async (req, res) => {
         original({ ok: true, results });
     } catch {
         original({ ok: false, error: "lookup failed" });
+    }
+});
+
+// GET /api/ddc/bail-roster
+// Returns all files containing "Bail Roster" in title or s3Url
+// Add at the top of ddc.js
+const AWS = require("aws-sdk");
+
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
+});
+
+// GET /api/ddc/bail-roster-files
+router.get("/bail-roster-files", async (req, res) => {
+    try {
+        const params = {
+            Bucket: "lawgikalai-bucket",
+            Prefix: "bareacts/", // folder inside the bucket
+        };
+
+        const data = await s3.listObjectsV2(params).promise();
+
+        // Filter only PDF files that have "bail" or "roster" in the key
+        const pdfFiles = (data.Contents || [])
+            .filter(
+                (obj) =>
+                    obj.Key.toLowerCase().includes("bail") &&
+                    obj.Key.toLowerCase().endsWith(".pdf")
+            )
+            .map((obj) => ({
+                key: obj.Key,
+                url: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`,
+            }));
+
+        res.json({ ok: true, result: pdfFiles });
+    } catch (err) {
+        console.error("Error fetching Bail Roster PDFs:", err);
+        res.status(500).json({ ok: false, error: "Server error" });
     }
 });
 
