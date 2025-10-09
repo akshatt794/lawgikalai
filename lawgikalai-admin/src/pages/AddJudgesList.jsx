@@ -1,6 +1,15 @@
 import { useState } from "react";
 import axios from "axios";
-import { Plus, X, Send, Scale, Users } from "lucide-react";
+import {
+    Plus,
+    X,
+    Send,
+    Scale,
+    Users,
+    MapPin,
+    CheckCircle,
+    AlertCircle,
+} from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -71,7 +80,7 @@ export default function AddJudgesList() {
             setMsgType("success");
             setJudges([emptyJudge]);
         } catch (err) {
-            console.error("❌ Upload Error:", err);
+            console.error("Upload Error:", err);
             setMsg(
                 err.response?.data?.error ||
                     err.message ||
@@ -83,8 +92,16 @@ export default function AddJudgesList() {
         }
     };
 
+    // Count zones
+    const uniqueZones = new Set(
+        judges.filter((j) => j.zone).map((j) => j.zone)
+    );
+    const completedJudges = judges.filter(
+        (j) => j.name && j.designation_jurisdiction && j.court_room && j.zone
+    ).length;
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-gray-900 py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-10">
@@ -97,8 +114,59 @@ export default function AddJudgesList() {
                         Add Judges List
                     </h1>
                     <p className="text-gray-400 text-lg">
-                        Add and manage multiple judges easily
+                        Manage and add multiple judges to the system
                     </p>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm font-medium mb-1">
+                                    Total Judges
+                                </p>
+                                <p className="text-3xl font-bold text-white">
+                                    {judges.length}
+                                </p>
+                            </div>
+                            <div className="bg-amber-500/10 p-3 rounded-lg">
+                                <Users className="h-8 w-8 text-amber-400" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm font-medium mb-1">
+                                    Completed
+                                </p>
+                                <p className="text-3xl font-bold text-white">
+                                    {completedJudges}
+                                </p>
+                            </div>
+                            <div className="bg-green-500/10 p-3 rounded-lg">
+                                <CheckCircle className="h-8 w-8 text-green-400" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm font-medium mb-1">
+                                    Zones Covered
+                                </p>
+                                <p className="text-3xl font-bold text-white">
+                                    {uniqueZones.size}
+                                </p>
+                            </div>
+                            <div className="bg-blue-500/10 p-3 rounded-lg">
+                                <MapPin className="h-8 w-8 text-blue-400" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Form */}
@@ -106,29 +174,41 @@ export default function AddJudgesList() {
                     onSubmit={handleSubmit}
                     className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl shadow-2xl p-8 border border-gray-700/50"
                 >
-                    {/* Judges Count */}
+                    {/* Section Header */}
                     <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center space-x-2 bg-slate-700/50 px-4 py-2 rounded-lg">
-                            <Users className="h-5 w-5 text-amber-400" />
-                            <span className="text-white font-semibold">
-                                {judges.length}{" "}
-                                {judges.length === 1 ? "Judge" : "Judges"}
-                            </span>
+                        <div className="flex items-center space-x-2">
+                            <div className="bg-amber-500/10 p-2 rounded-lg">
+                                <Scale className="h-5 w-5 text-amber-400" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">
+                                Judge Details
+                            </h2>
                         </div>
+                        <span className="text-gray-400 text-sm">
+                            {judges.length}{" "}
+                            {judges.length === 1 ? "Entry" : "Entries"}
+                        </span>
                     </div>
 
                     {/* Judges List */}
-                    <div className="space-y-6 mb-8">
+                    <div className="space-y-4 mb-6">
                         {judges.map((judge, index) => (
                             <div
                                 key={index}
-                                className="bg-slate-900/50 p-6 rounded-xl border border-gray-700/50 hover:border-amber-500/30 transition-all duration-300"
+                                className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700/50 hover:border-amber-500/30 transition-all duration-300"
                             >
                                 {/* Header */}
                                 <div className="flex items-center justify-between mb-4">
-                                    <span className="text-amber-400 font-semibold text-sm">
-                                        Judge #{index + 1}
-                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="bg-amber-500/20 w-8 h-8 rounded-lg flex items-center justify-center">
+                                            <span className="text-amber-400 font-bold text-sm">
+                                                {index + 1}
+                                            </span>
+                                        </div>
+                                        <span className="text-white font-semibold">
+                                            Judge #{index + 1}
+                                        </span>
+                                    </div>
                                     {judges.length > 1 && (
                                         <button
                                             type="button"
@@ -237,30 +317,84 @@ export default function AddJudgesList() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
+                            className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
                         >
-                            <Send className="h-5 w-5" />
-                            <span>
-                                {loading
-                                    ? "Submitting..."
-                                    : "Submit All Judges"}
-                            </span>
+                            {loading ? (
+                                <>
+                                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                                    <span>Submitting...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Send className="h-5 w-5" />
+                                    <span>Submit All Judges</span>
+                                </>
+                            )}
                         </button>
                     </div>
 
                     {/* Status Message */}
                     {msg && (
                         <div
-                            className={`mt-6 p-4 rounded-lg border text-center font-medium ${
+                            className={`mt-6 flex items-start space-x-3 p-4 rounded-lg border ${
                                 msgType === "success"
-                                    ? "bg-green-500/10 border-green-500/50 text-green-400"
-                                    : "bg-red-500/10 border-red-500/50 text-red-400"
+                                    ? "bg-green-500/10 border-green-500/50"
+                                    : "bg-red-500/10 border-red-500/50"
                             }`}
                         >
-                            {msg}
+                            {msgType === "success" ? (
+                                <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                            ) : (
+                                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                            )}
+                            <p
+                                className={`text-sm font-medium ${
+                                    msgType === "success"
+                                        ? "text-green-400"
+                                        : "text-red-400"
+                                }`}
+                            >
+                                {msg}
+                            </p>
                         </div>
                     )}
                 </form>
+
+                {/* Help Section */}
+                <div className="mt-8 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                    <h3 className="text-white font-semibold mb-4 flex items-center">
+                        <span className="mr-2">💡</span>
+                        Tips for Adding Judges
+                    </h3>
+                    <ul className="grid md:grid-cols-2 gap-3 text-gray-400 text-sm">
+                        <li className="flex items-start">
+                            <span className="text-amber-400 mr-2">•</span>
+                            <span>
+                                Ensure all required fields are filled accurately
+                            </span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-amber-400 mr-2">•</span>
+                            <span>
+                                Double-check court room numbers before
+                                submission
+                            </span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-amber-400 mr-2">•</span>
+                            <span>
+                                VC links should be complete URLs starting with
+                                https://
+                            </span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-amber-400 mr-2">•</span>
+                            <span>
+                                Select the appropriate zone for each judge
+                            </span>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     );
