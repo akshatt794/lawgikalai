@@ -19,66 +19,43 @@ const zones = [
 ];
 
 export default function UploadBailRoster() {
-    const [formData, setFormData] = useState({
-        judicial_officer: "",
-        first_link_officer: "",
-        second_link_officer: "",
-        police_station: "",
-        zone: "",
-        file: null,
-    });
-
-    const [preview, setPreview] = useState("");
+    const [zone, setZone] = useState("");
+    const [file, setFile] = useState(null);
     const [msg, setMsg] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Handle input change
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    };
-
-    // Handle file input
     const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        setFormData((prev) => ({ ...prev, file }));
-        if (file && file.type.startsWith("image/")) {
-            setPreview(URL.createObjectURL(file));
-        } else {
-            setPreview("");
-        }
+        setFile(e.target.files[0]);
     };
 
-    // Handle form submit
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMsg("");
         setLoading(true);
 
+        if (!zone || !file) {
+            setMsg("⚠️ Please select a zone and upload a file.");
+            setLoading(false);
+            return;
+        }
+
         try {
             const token = localStorage.getItem("token");
-            const uploadData = new FormData();
-            Object.entries(formData).forEach(([key, value]) => {
-                if (value) uploadData.append(key, value);
-            });
+            const formData = new FormData();
+            formData.append("zone", zone);
+            formData.append("file", file);
 
-            await axios.post(`${API_URL}/api/bailroster/upload`, uploadData, {
+            await axios.post(`${API_URL}/api/bailroster/upload`, formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
             });
 
-            setMsg("✅ Bail Roster uploaded successfully!");
-            setFormData({
-                judicial_officer: "",
-                first_link_officer: "",
-                second_link_officer: "",
-                police_station: "",
-                zone: "",
-                file: null,
-            });
-            setPreview("");
+            setMsg("✅ Bail roster uploaded successfully!");
+            setZone("");
+            setFile(null);
+            e.target.reset(); // reset file input
         } catch (err) {
             console.error(err);
             setMsg(
@@ -86,8 +63,9 @@ export default function UploadBailRoster() {
                     err.response?.data?.error || err.message || "Unknown error"
                 }`
             );
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
@@ -116,88 +94,24 @@ export default function UploadBailRoster() {
                 }}
             >
                 <h2
-                    style={{ color: "#fff", marginBottom: 32, fontWeight: 700 }}
+                    style={{
+                        color: "#fff",
+                        marginBottom: 32,
+                        fontWeight: 700,
+                        textAlign: "center",
+                    }}
                 >
                     Upload Bail Roster
                 </h2>
 
-                {/* Judicial Officer */}
-                <input
-                    placeholder="Name of the Ld. Judicial Officer *"
-                    name="judicial_officer"
-                    value={formData.judicial_officer}
-                    onChange={handleChange}
-                    required
-                    style={{
-                        marginBottom: 18,
-                        padding: 12,
-                        borderRadius: 6,
-                        border: "none",
-                        fontSize: 16,
-                        background: "#242943",
-                        color: "#fff",
-                    }}
-                />
-
-                {/* 1st Link Officer */}
-                <input
-                    placeholder="Name of the 1st Link Ld. Judicial Officer"
-                    name="first_link_officer"
-                    value={formData.first_link_officer}
-                    onChange={handleChange}
-                    style={{
-                        marginBottom: 18,
-                        padding: 12,
-                        borderRadius: 6,
-                        border: "none",
-                        fontSize: 16,
-                        background: "#242943",
-                        color: "#fff",
-                    }}
-                />
-
-                {/* 2nd Link Officer */}
-                <input
-                    placeholder="Name of the 2nd Link Ld. Judicial Officer"
-                    name="second_link_officer"
-                    value={formData.second_link_officer}
-                    onChange={handleChange}
-                    style={{
-                        marginBottom: 18,
-                        padding: 12,
-                        borderRadius: 6,
-                        border: "none",
-                        fontSize: 16,
-                        background: "#242943",
-                        color: "#fff",
-                    }}
-                />
-
-                {/* Police Station */}
-                <input
-                    placeholder="Police Station"
-                    name="police_station"
-                    value={formData.police_station}
-                    onChange={handleChange}
-                    style={{
-                        marginBottom: 18,
-                        padding: 12,
-                        borderRadius: 6,
-                        border: "none",
-                        fontSize: 16,
-                        background: "#242943",
-                        color: "#fff",
-                    }}
-                />
-
                 {/* Zone Selector */}
                 <select
                     name="zone"
-                    value={formData.zone}
-                    onChange={handleChange}
+                    value={zone}
+                    onChange={(e) => setZone(e.target.value)}
                     required
                     style={{
-                        marginBottom: 18,
+                        marginBottom: 20,
                         padding: 12,
                         borderRadius: 6,
                         border: "none",
@@ -217,29 +131,14 @@ export default function UploadBailRoster() {
                 {/* File Upload */}
                 <input
                     type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
+                    accept=".pdf"
                     onChange={handleFileChange}
+                    required
                     style={{
-                        marginBottom: 16,
+                        marginBottom: 20,
                         color: "#fff",
                     }}
                 />
-
-                {/* Preview */}
-                {preview && (
-                    <img
-                        src={preview}
-                        alt="Preview"
-                        style={{
-                            width: "100%",
-                            maxHeight: 180,
-                            objectFit: "cover",
-                            borderRadius: 12,
-                            marginBottom: 18,
-                            border: "1px solid #23243a",
-                        }}
-                    />
-                )}
 
                 {/* Submit Button */}
                 <button
@@ -256,7 +155,6 @@ export default function UploadBailRoster() {
                         fontSize: 18,
                         cursor: "pointer",
                         boxShadow: "0 3px 8px rgba(48,60,130,0.08)",
-                        marginBottom: 10,
                         transition: "0.15s",
                         opacity: loading ? 0.6 : 1,
                     }}
@@ -269,8 +167,9 @@ export default function UploadBailRoster() {
                     <p
                         style={{
                             color: "#e3e3e3",
-                            marginTop: 5,
+                            marginTop: 10,
                             minHeight: 20,
+                            textAlign: "center",
                         }}
                     >
                         {msg}

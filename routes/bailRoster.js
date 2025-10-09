@@ -1,14 +1,12 @@
-// routes/bailRoster.js
 const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/multer");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const BailRoster = require("../models/BailRoster");
 
-// Initialize S3 client
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 
-// ✅ Utility: Upload to S3
+// ✅ Upload helper
 async function uploadToS3(buffer, key, contentType) {
     const params = {
         Bucket: process.env.S3_BUCKET_NAME,
@@ -16,7 +14,7 @@ async function uploadToS3(buffer, key, contentType) {
         Body: buffer,
         ContentType: contentType,
     };
-    return await s3.send(new PutObjectCommand(params));
+    await s3.send(new PutObjectCommand(params));
 }
 
 // ✅ POST /api/bailroster/upload
@@ -24,14 +22,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     try {
         console.log("➡️ Bail Roster upload hit");
 
-        const {
-            judicial_officer,
-            first_link_officer,
-            second_link_officer,
-            police_station,
-            zone,
-        } = req.body;
-
+        const { zone } = req.body;
         if (!req.file)
             return res.status(400).json({ error: "No file uploaded" });
         if (!zone) return res.status(400).json({ error: "Zone is required" });
@@ -47,10 +38,6 @@ router.post("/upload", upload.single("file"), async (req, res) => {
         const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
 
         const newRoster = new BailRoster({
-            judicial_officer,
-            first_link_officer,
-            second_link_officer,
-            police_station,
             zone: zone.toUpperCase(),
             file_name: req.file.originalname,
             file_url: fileUrl,
@@ -73,16 +60,51 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
 // ✅ GET /api/bailroster
 // Optional ?zone= filter
+// Always return the most recent file per zone (latest by createdAt)
 router.get("/", async (req, res) => {
     try {
         const { zone } = req.query;
         const filter = zone ? { zone: zone.toUpperCase() } : {};
-        const rosters = await BailRoster.find(filter).sort({ createdAt: -1 });
+
+        // If zone provided → return the latest one
+        if (zone) {
+            const latestRoster = await BailRoster.findOne(filter)
+                .sort({ createdAt: -1 })
+                .lean();
+            if (!latestRoster)
+                return res
+                    .status(404)
+                    .json({ error: "No bail roster found for this zone" });
+
+            return res.json({
+                message: "Latest bail roster fetched successfully",
+                data: latestRoster,
+            });
+        }
+
+        // If no zone → return latest document for each zone
+        const latestRosters = await BailRoster.aggregate([
+            {
+                $sort: { createdAt: -1 },
+            },
+            {
+                $group: {
+                    _id: "$zone",
+                    latestRoster: { $first: "$$ROOT" },
+                },
+            },
+            {
+                $replaceRoot: { newRoot: "$latestRoster" },
+            },
+            {
+                $sort: { zone: 1 },
+            },
+        ]);
 
         res.json({
-            message: "Bail rosters fetched successfully",
-            count: rosters.length,
-            data: rosters,
+            message: "Latest bail rosters fetched successfully for all zones",
+            count: latestRosters.length,
+            data: latestRosters,
         });
     } catch (err) {
         console.error("❌ Error fetching bail rosters:", err);
