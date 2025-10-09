@@ -24,7 +24,7 @@ const CATEGORIES = [
     { key: "JUDGES_LIST", label: "Judges List" },
     { key: "JUDGES_ON_LEAVE", label: "Judges On Leave" },
     { key: "BAIL_ROSTER", label: "Bail Roster" },
-    { key: "DUTY_MAGISTRATE_ROSTER", label: "Duty Magistrate Roaster" },
+    { key: "DUTY_MAGISTRATE_ROSTER", label: "Duty Magistrate Roster" },
 ];
 
 // ---------- Multer (optional file upload) ----------
@@ -461,6 +461,5 @@ const s3 = new AWS.S3({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_REGION,
 });
-
 
 module.exports = router;
