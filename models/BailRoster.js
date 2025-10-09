@@ -1,11 +1,6 @@
-// models/BailRoster.js
 const mongoose = require("mongoose");
 
 const bailRosterSchema = new mongoose.Schema({
-    judicial_officer: { type: String, required: true },
-    first_link_officer: { type: String, required: false },
-    second_link_officer: { type: String, required: false },
-    police_station: { type: String, required: false },
     zone: {
         type: String,
         required: true,
