@@ -57,7 +57,7 @@ export default function AddJudgesList() {
         try {
             const token = localStorage.getItem("token");
             const { data } = await axios.post(
-                `${API_URL}/api/judges-list/add-multiple`,
+                `${API_URL}/api/judgeList/add-multiple`,
                 { judges },
                 {
                     headers: {
