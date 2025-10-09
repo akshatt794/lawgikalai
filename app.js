@@ -35,6 +35,7 @@ const aiDraftingRoutes = require("./routes/aiDrafting");
 const notificationsRoutes = require("./routes/notifications");
 const bareactRoutes = require("./routes/bareact");
 const bailRosterRoutes = require("./routes/bailRoster");
+const judgesListRoutes = require("./routes/judgesList");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
@@ -118,6 +119,7 @@ app.use("/api/ddc", ddcRoutes); // UI structure + upload + search over PDFs
 app.use("/api/court-vc", courtVCRoutes); // VC table CRUD/search
 
 app.use("/api/bailroster", bailRosterRoutes);
+app.use("/api/judgelist", judgesListRoutes);
 
 // Health / base
 app.get("/", (_req, res) => {
