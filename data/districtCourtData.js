@@ -35,7 +35,7 @@ const districtCourtData = {
             CBI: "https://centraldelhi.dcourts.gov.in/list-of-judges/",
         },
     ],
-    dutyMagistrateRoaster: [
+    dutyMagistrateRoster: [
         {
             NORTH: "https://northdelhi.dcourts.gov.in/duty-magistrate/",
             "NORTH WEST": "https://rohini.dcourts.gov.in/duty-magistrate/",

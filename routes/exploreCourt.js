@@ -45,18 +45,15 @@ router.get("/get-link", async (req, res) => {
             case "judges list":
                 url = districtCourtData.judgesList[0][normalizedZone];
                 break;
-            case "duty magistrate roster":
-            case "duty magistrate roaster": // in case spelling varies
+            case "duty magistrate roster": // in case spelling varies
                 url =
-                    districtCourtData.dutyMagistrateRoaster[0][normalizedZone];
+                    districtCourtData.dutyMagistrateRoster[0][normalizedZone];
                 break;
             default:
-                return res
-                    .status(404)
-                    .json({
-                        ok: false,
-                        error: "Invalid label or no URL mapping found",
-                    });
+                return res.status(404).json({
+                    ok: false,
+                    error: "Invalid label or no URL mapping found",
+                });
         }
 
         if (!url) {
