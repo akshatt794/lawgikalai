@@ -17,16 +17,43 @@ async function uploadToS3(buffer, key, contentType) {
     await s3.send(new PutObjectCommand(params));
 }
 
-// ✅ POST /api/bailroster/upload
+/**
+ * @route POST /api/bailroster/upload
+ * @desc Upload a bail roster PDF + multiple officers for a zone
+ */
 router.post("/upload", upload.single("file"), async (req, res) => {
     try {
         console.log("➡️ Bail Roster upload hit");
 
-        const { zone } = req.body;
-        if (!req.file)
-            return res.status(400).json({ error: "No file uploaded" });
-        if (!zone) return res.status(400).json({ error: "Zone is required" });
+        const { zone, officers } = req.body;
 
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        if (!zone) {
+            return res.status(400).json({ error: "Zone is required" });
+        }
+
+        if (!officers) {
+            return res.status(400).json({ error: "Officers data is required" });
+        }
+
+        // Parse officers JSON (sent as string from frontend)
+        let officerData;
+        try {
+            officerData = JSON.parse(officers);
+        } catch (err) {
+            return res.status(400).json({ error: "Invalid officers format" });
+        }
+
+        if (!Array.isArray(officerData) || officerData.length === 0) {
+            return res
+                .status(400)
+                .json({ error: "At least one officer entry is required" });
+        }
+
+        // 🔹 Upload file to S3
         const safeZone = zone.trim().replace(/\s+/g, "_").toUpperCase();
         const fileKey = `bailroster/${safeZone}/${Date.now()}_${req.file.originalname.replace(
             /\s+/g,
@@ -37,10 +64,12 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
         const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
 
+        // 🔹 Save to MongoDB
         const newRoster = new BailRoster({
             zone: zone.toUpperCase(),
             file_name: req.file.originalname,
             file_url: fileUrl,
+            officers: officerData, // 👈 array of officer entries
         });
 
         const saved = await newRoster.save();
@@ -58,47 +87,46 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     }
 });
 
-// ✅ GET /api/bailroster
-// Optional ?zone= filter
-// Always return the most recent file per zone (latest by createdAt) everytime
+/**
+ * @route GET /api/bailroster
+ * @desc Fetch latest bail roster(s)
+ *        - If ?zone provided → latest for that zone
+ *        - Else → latest per zone
+ */
 router.get("/", async (req, res) => {
     try {
         const { zone } = req.query;
         const filter = zone ? { zone: zone.toUpperCase() } : {};
 
-        // If zone provided → return the latest one
         if (zone) {
+            // Get latest for given zone
             const latestRoster = await BailRoster.findOne(filter)
                 .sort({ createdAt: -1 })
                 .lean();
-            if (!latestRoster)
+
+            if (!latestRoster) {
                 return res
                     .status(404)
                     .json({ error: "No bail roster found for this zone" });
+            }
 
             return res.json({
-                message: "Latest bail roster fetched successfully",
+                message: `Latest bail roster fetched successfully for zone ${zone.toUpperCase()}`,
                 data: latestRoster,
             });
         }
 
-        // If no zone → return latest document for each zone
+        // No zone → get latest for each zone
         const latestRosters = await BailRoster.aggregate([
-            {
-                $sort: { createdAt: -1 },
-            },
+            { $sort: { createdAt: -1 } },
             {
                 $group: {
                     _id: "$zone",
                     latestRoster: { $first: "$$ROOT" },
                 },
             },
-            {
-                $replaceRoot: { newRoot: "$latestRoster" },
-            },
-            {
-                $sort: { zone: 1 },
-            },
+            { $replaceRoot: { newRoot: "$latestRoster" } },
+            { $sort: { zone: 1 } },
         ]);
 
         res.json({
