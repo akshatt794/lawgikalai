@@ -10,6 +10,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import UploadOrders from "./pages/UploadOrders";
 import AddJudgesList from "./pages/AddJudgesList";
 import AddBailRoster from "./pages/AddBailRoster";
+import AddBareAct from "./pages/AddBareAct";
 
 // Inside your <Routes> block:
 
@@ -60,6 +61,9 @@ function Navbar() {
             <Link to="/admin/add-judges" style={navLinkStyle}>
                 Add Judges
             </Link>
+            <Link to="/admin/add-bareact" style={navLinkStyle}>
+                Add Bare Act
+            </Link>
         </nav>
     );
 }
@@ -84,6 +88,7 @@ function AppWithNavbar() {
                     element={<AddBailRoster />}
                 />
                 <Route path="/admin/add-judges" element={<AddJudgesList />} />
+                <Route path="/admin/add-bareact" element={<AddBareAct />} />
             </Routes>
         </>
     );
