@@ -8,8 +8,8 @@ import Users from "./pages/Users";
 import ExplorePage from "./pages/ExplorePage";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import UploadOrders from "./pages/UploadOrders";
-import UploadBailRoster from "./pages/UploadBailRoster";
 import AddJudgesList from "./pages/AddJudgesList";
+import AddBailRoster from "./pages/AddBailRoster";
 
 // Inside your <Routes> block:
 
@@ -54,8 +54,8 @@ function Navbar() {
             <Link to="/admin/upload-orders" style={navLinkStyle}>
                 Upload Orders
             </Link>
-            <Link to="/admin/upload-bail-roster" style={navLinkStyle}>
-                Upload Bail Roster
+            <Link to="/admin/add-bail-roster" style={navLinkStyle}>
+                Add Bail Roster
             </Link>
             <Link to="/admin/add-judges" style={navLinkStyle}>
                 Add Judges
@@ -80,8 +80,8 @@ function AppWithNavbar() {
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/admin/upload-orders" element={<UploadOrders />} />
                 <Route
-                    path="/admin/upload-bail-roster"
-                    element={<UploadBailRoster />}
+                    path="/admin/add-bail-roster"
+                    element={<AddBailRoster />}
                 />
                 <Route path="/admin/add-judges" element={<AddJudgesList />} />
             </Routes>
