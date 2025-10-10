@@ -77,36 +77,41 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
 });
 
 // 📥 GET DOCUMENTS
-// 0 = Criminal Law, 1 = Bare Acts, 2 = Events
-router.get("/:type", async (req, res) => {
+// 0 = Criminal Law, 1 = Bare Acts, 2 = Events 3 = Forms
+router.get("/", async (req, res) => {
     try {
-        const { type } = req.params;
+        const { type } = req.query; // 👈 from query params, e.g., ?type=0
         let category;
 
-        // Type Mapping
+        // 🔹 Type → Category Mapping
         if (type === "0") category = "CriminalLaw";
         else if (type === "1") category = "BareAct";
         else if (type === "2") category = "Event";
         else if (type === "3") category = "Forms";
-        else
+        else {
             return res.status(400).json({
+                status: false,
                 message:
-                    "Invalid type. Use 0 for CriminalLaw, 1 for BareAct, 2 for Event.",
+                    "Invalid or missing 'type' query. Use ?type=0 (CriminalLaw), ?type=1 (BareAct), ?type=2 (Event), ?type=3 (Forms).",
             });
+        }
 
+        // 🔹 Fetch from MongoDB
         const docs = await GeneralDocument.find({ category }).sort({
             createdAt: -1,
         });
 
-        // Title Mapping
+        // 🔹 Title Mapping
         const titleMap = {
             BareAct: "Bare Acts Library",
             CriminalLaw: "Criminal Law Resources",
             Event: "Legal Events and Conferences",
-            Form: "Legal Forms",
+            Forms: "Legal Forms",
         };
 
+        // 🔹 Response
         return res.status(200).json({
+            status: true,
             message: "Documents fetched successfully",
             title: titleMap[category],
             data: {
@@ -120,8 +125,9 @@ router.get("/:type", async (req, res) => {
             },
         });
     } catch (err) {
-        console.error("Fetch Documents Error:", err);
+        console.error("❌ Fetch Documents Error:", err);
         return res.status(500).json({
+            status: false,
             message: "Failed to fetch documents",
             error: err.message,
         });
