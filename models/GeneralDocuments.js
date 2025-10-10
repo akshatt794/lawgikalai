@@ -11,7 +11,7 @@ const documentSchema = new mongoose.Schema(
         category: {
             type: String,
             required: true,
-            enum: ["BareAct", "CriminalLaw", "Event"],
+            enum: ["BareAct", "CriminalLaw", "Event", "Form"],
         },
         file_name: {
             type: String,

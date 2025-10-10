@@ -11,6 +11,7 @@ import {
     Scale,
     CalendarDays,
     Info,
+    ClipboardList,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -23,10 +24,7 @@ export default function AddGeneralDocument() {
     const [msg, setMsg] = useState("");
     const [msgType, setMsgType] = useState("");
 
-    const handleFileChange = (e) => {
-        setFile(e.target.files[0]);
-    };
-
+    const handleFileChange = (e) => setFile(e.target.files[0]);
     const removeFile = () => setFile(null);
 
     const handleSubmit = async (e) => {
@@ -78,7 +76,7 @@ export default function AddGeneralDocument() {
         }
     };
 
-    // Dynamic UI colors & icons based on category
+    // 🔹 Dynamic UI based on category
     const categoryStyles = {
         BareAct: {
             color: "from-indigo-500 to-purple-600",
@@ -121,6 +119,21 @@ export default function AddGeneralDocument() {
                 "Legal Workshop Materials",
                 "Seminar Proceedings",
                 "Conference Papers",
+            ],
+        },
+        Forms: {
+            color: "from-green-500 to-emerald-600",
+            bgColor: "bg-green-500/10",
+            textColor: "text-green-400",
+            icon: <ClipboardList className="h-10 w-10 text-white" />,
+            smallIcon: <ClipboardList className="h-8 w-8 text-green-400" />,
+            label: "Forms",
+            description:
+                "Court, legal, or administrative forms for legal processes",
+            examples: [
+                "Bail Application Form",
+                "Affidavit Template",
+                "Filing Form for Civil Case",
             ],
         },
     };
@@ -225,6 +238,7 @@ export default function AddGeneralDocument() {
                             <option value="BareAct">Bare Act</option>
                             <option value="CriminalLaw">Criminal Law</option>
                             <option value="Event">Event</option>
+                            <option value="Forms">Forms</option>
                         </select>
                         <p className="text-gray-500 text-xs mt-2">
                             Choose the appropriate category for your document
@@ -250,72 +264,64 @@ export default function AddGeneralDocument() {
                     </div>
 
                     {/* File Upload */}
-                    <div>
-                        <label className="block text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wide">
-                            Upload File (PDF) *
-                        </label>
-
-                        {!file ? (
-                            <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-slate-900/50 transition-all duration-300 group">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <div className="bg-indigo-500/10 p-5 rounded-full mb-4 group-hover:bg-indigo-500/20 transition-colors">
-                                        <Upload className="h-12 w-12 text-indigo-400" />
-                                    </div>
-                                    <p className="mb-2 text-base text-gray-400">
-                                        <span className="font-semibold text-indigo-400">
-                                            Click to upload
-                                        </span>{" "}
-                                        or drag and drop
-                                    </p>
-                                    <p className="text-sm text-gray-500 mb-1">
-                                        PDF files only
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                        Max file size: 50MB
-                                    </p>
+                    {!file ? (
+                        <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-slate-900/50 transition-all duration-300 group">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <div className="bg-indigo-500/10 p-5 rounded-full mb-4 group-hover:bg-indigo-500/20 transition-colors">
+                                    <Upload className="h-12 w-12 text-indigo-400" />
                                 </div>
-                                <input
-                                    type="file"
-                                    accept=".pdf"
-                                    onChange={handleFileChange}
-                                    required
-                                    className="hidden"
-                                />
-                            </label>
-                        ) : (
-                            <div className="relative group">
-                                <div className="flex items-center justify-between bg-slate-900 border border-gray-700 rounded-xl p-6 hover:border-indigo-500/50 transition-all duration-200">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="bg-indigo-500/10 p-3 rounded-lg">
-                                            <FileText className="h-8 w-8 text-indigo-400" />
-                                        </div>
-                                        <div>
-                                            <p className="text-white font-semibold">
-                                                {file.name}
-                                            </p>
-                                            <p className="text-gray-400 text-sm">
-                                                {(
-                                                    file.size /
-                                                    1024 /
-                                                    1024
-                                                ).toFixed(2)}{" "}
-                                                MB
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={removeFile}
-                                        className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg shadow-lg transition-all duration-200"
-                                    >
-                                        <X className="h-5 w-5" />
-                                    </button>
-                                </div>
+                                <p className="mb-2 text-base text-gray-400">
+                                    <span className="font-semibold text-indigo-400">
+                                        Click to upload
+                                    </span>{" "}
+                                    or drag and drop
+                                </p>
+                                <p className="text-sm text-gray-500 mb-1">
+                                    PDF files only
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                    Max file size: 50MB
+                                </p>
                             </div>
-                        )}
-                    </div>
+                            <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={handleFileChange}
+                                required
+                                className="hidden"
+                            />
+                        </label>
+                    ) : (
+                        <div className="relative group">
+                            <div className="flex items-center justify-between bg-slate-900 border border-gray-700 rounded-xl p-6 hover:border-indigo-500/50 transition-all duration-200">
+                                <div className="flex items-center space-x-4">
+                                    <div className="bg-indigo-500/10 p-3 rounded-lg">
+                                        <FileText className="h-8 w-8 text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-semibold">
+                                            {file.name}
+                                        </p>
+                                        <p className="text-gray-400 text-sm">
+                                            {(file.size / 1024 / 1024).toFixed(
+                                                2
+                                            )}{" "}
+                                            MB
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={removeFile}
+                                    className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg shadow-lg transition-all duration-200"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
-                    {/* Submit Button */}
+                    {/* Submit */}
                     <button
                         type="submit"
                         disabled={loading}
@@ -361,7 +367,7 @@ export default function AddGeneralDocument() {
                     )}
                 </form>
 
-                {/* Category Info Card - Dynamic based on selection */}
+                {/* Example Titles Section */}
                 <div
                     className={`mt-8 bg-gradient-to-r ${color} bg-opacity-10 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6`}
                 >
