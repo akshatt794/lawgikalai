@@ -10,6 +10,8 @@ import {
     Gavel,
 } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const UploadOrders = () => {
     const [title, setTitle] = useState("");
     const [pdfFile, setPdfFile] = useState(null);
@@ -45,7 +47,7 @@ const UploadOrders = () => {
 
         try {
             const res = await axios.post(
-                "https://lawgikalai-auth-api.onrender.com/api/orders/upload",
+                `${API_URL}/api/orders/upload`,
                 formData,
                 {
                     headers: { "Content-Type": "multipart/form-data" },
