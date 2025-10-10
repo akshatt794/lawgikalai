@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const AWS = require("aws-sdk");
-const GeneralDocument = require("../models/GeneralDocument");
+const GeneralDocument = require("../models/GeneralDocuments");
 
 const router = express.Router();
 
