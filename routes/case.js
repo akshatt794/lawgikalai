@@ -112,18 +112,21 @@ router.get("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Missing caseId parameter" });
         }
 
-        const caseDetails = await Case.findById(caseId);
+        const caseDetails = await Case.findOne({ case_id: caseId });
 
         if (!caseDetails) {
             return res.status(404).json({ error: "Case not found" });
         }
 
         res.json({
-            message: "Case details fetched successfully",
+            message: "Case details fetched successfully (by case_id)",
             data: caseDetails,
         });
     } catch (err) {
-        res.status(500).json({ error: "Server error", details: err.message });
+        res.status(500).json({
+            error: "Server error while fetching by case_id",
+            details: err.message,
+        });
     }
 });
 // ✅ Delete a case by case_id (only if user owns it)
