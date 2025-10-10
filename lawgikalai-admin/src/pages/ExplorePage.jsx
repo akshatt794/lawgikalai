@@ -6,14 +6,15 @@ import {
     X,
     CheckCircle,
     AlertCircle,
-    TrendingUp,
+    ClipboardList,
+    FolderOpen,
 } from "lucide-react";
 
 export default function ExplorePage() {
     const [title, setTitle] = useState("");
     const [pdf, setPdf] = useState(null);
     const [msg, setMsg] = useState("");
-    const [msgType, setMsgType] = useState(""); // success or error
+    const [msgType, setMsgType] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleFileChange = (e) => {
@@ -21,9 +22,7 @@ export default function ExplorePage() {
         setPdf(file);
     };
 
-    const removePdf = () => {
-        setPdf(null);
-    };
+    const removePdf = () => setPdf(null);
 
     const handleUpload = async (e) => {
         e.preventDefault();
@@ -38,7 +37,7 @@ export default function ExplorePage() {
         try {
             const token = localStorage.getItem("token");
             await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/explore/upload`,
+                `${import.meta.env.VITE_API_URL}/api/explore-form/upload`,
                 formData,
                 {
                     headers: {
@@ -47,7 +46,7 @@ export default function ExplorePage() {
                     },
                 }
             );
-            setMsg("PDF uploaded successfully!");
+            setMsg("Form uploaded successfully!");
             setMsgType("success");
             setTitle("");
             setPdf(null);
@@ -69,15 +68,50 @@ export default function ExplorePage() {
                 <div className="text-center mb-10">
                     <div className="flex justify-center items-center mb-4">
                         <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-4 rounded-2xl shadow-xl">
-                            <TrendingUp className="h-10 w-10 text-white" />
+                            <ClipboardList className="h-10 w-10 text-white" />
                         </div>
                     </div>
                     <h1 className="text-4xl font-bold text-white mb-2">
-                        Explore Documents
+                        Upload Legal Forms
                     </h1>
                     <p className="text-gray-400 text-lg">
-                        Upload PDF documents for analysis and exploration
+                        Upload and manage various legal form PDFs
                     </p>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm font-medium mb-1">
+                                    Form Status
+                                </p>
+                                <p className="text-xl font-bold text-white">
+                                    {title ? "Ready" : "Pending"}
+                                </p>
+                            </div>
+                            <div className="bg-amber-500/10 p-3 rounded-lg">
+                                <ClipboardList className="h-8 w-8 text-amber-400" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm font-medium mb-1">
+                                    File Uploaded
+                                </p>
+                                <p className="text-xl font-bold text-white">
+                                    {pdf ? "Yes" : "No"}
+                                </p>
+                            </div>
+                            <div className="bg-orange-500/10 p-3 rounded-lg">
+                                <FolderOpen className="h-8 w-8 text-orange-400" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Form Container */}
@@ -88,22 +122,25 @@ export default function ExplorePage() {
                     {/* Title Input */}
                     <div>
                         <label className="block text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wide">
-                            Document Title *
+                            Form Title *
                         </label>
                         <input
                             type="text"
-                            placeholder="Enter a descriptive title for your PDF..."
+                            placeholder="e.g., Bail Application Form, FIR Template, Notice Format"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             required
                             className="w-full px-4 py-3 bg-slate-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all duration-200"
                         />
+                        <p className="text-gray-500 text-xs mt-2">
+                            Enter a clear, descriptive title for the legal form
+                        </p>
                     </div>
 
                     {/* PDF Upload Section */}
                     <div>
                         <label className="block text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wide">
-                            PDF Document *
+                            Upload Form (PDF) *
                         </label>
 
                         {!pdf ? (
@@ -180,7 +217,7 @@ export default function ExplorePage() {
                         ) : (
                             <>
                                 <Upload className="h-5 w-5" />
-                                <span>Upload PDF Document</span>
+                                <span>Upload Form</span>
                             </>
                         )}
                     </button>
@@ -212,78 +249,85 @@ export default function ExplorePage() {
                     )}
                 </form>
 
-                {/* Info Cards Grid */}
+                {/* Info Cards */}
                 <div className="mt-8 grid md:grid-cols-2 gap-6">
-                    {/* Supported Features */}
+                    {/* Common Forms */}
                     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
                         <h3 className="text-white font-semibold mb-4 flex items-center">
-                            <span className="mr-2">✨</span>
-                            Supported Features
+                            <span className="mr-2">📋</span>
+                            Common Legal Forms
                         </h3>
                         <ul className="space-y-2 text-gray-400 text-sm">
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
-                                <span>Advanced PDF text extraction</span>
+                                <span>Bail Application Forms</span>
                             </li>
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
-                                <span>Document search and indexing</span>
+                                <span>Affidavit Templates</span>
                             </li>
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
-                                <span>Content analysis and insights</span>
+                                <span>Notice Formats</span>
                             </li>
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
-                                <span>Secure document storage</span>
+                                <span>Petition Templates</span>
                             </li>
                         </ul>
                     </div>
 
-                    {/* Upload Guidelines */}
+                    {/* Guidelines */}
                     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
                         <h3 className="text-white font-semibold mb-4 flex items-center">
-                            <span className="mr-2">📋</span>
+                            <span className="mr-2">✓</span>
                             Upload Guidelines
                         </h3>
                         <ul className="space-y-2 text-gray-400 text-sm">
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
-                                <span>Only PDF files are accepted</span>
-                            </li>
-                            <li className="flex items-start">
-                                <span className="text-amber-400 mr-2">•</span>
-                                <span>Maximum file size is 50MB</span>
+                                <span>Use clear, descriptive titles</span>
                             </li>
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
                                 <span>
-                                    Ensure PDFs are not password-protected
+                                    Ensure PDFs are fillable if possible
                                 </span>
                             </li>
                             <li className="flex items-start">
                                 <span className="text-amber-400 mr-2">•</span>
-                                <span>Use clear, descriptive titles</span>
+                                <span>Check for completeness</span>
+                            </li>
+                            <li className="flex items-start">
+                                <span className="text-amber-400 mr-2">•</span>
+                                <span>Verify legal accuracy</span>
                             </li>
                         </ul>
                     </div>
                 </div>
 
-                {/* Bottom Stats */}
-                <div className="mt-8 bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-sm rounded-xl border border-amber-500/20 p-6">
-                    <div className="flex items-center justify-center space-x-3">
-                        <div className="bg-amber-500/20 p-2 rounded-lg">
-                            <FileText className="h-6 w-6 text-amber-400" />
+                {/* Bottom Info Card */}
+                {/* <div className="mt-8 bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-sm rounded-xl border border-amber-500/20 p-6">
+                    <div className="flex items-start space-x-3">
+                        <div className="bg-amber-500/20 p-2 rounded-lg flex-shrink-0">
+                            <ClipboardList className="h-6 w-6 text-amber-400" />
                         </div>
-                        <p className="text-gray-300 text-center">
-                            <span className="font-semibold text-white">
-                                Pro Tip:
-                            </span>{" "}
-                            Documents are processed automatically for quick
-                            searching and analysis
-                        </p>
+                        <div>
+                            <h4 className="text-white font-semibold mb-2">
+                                Important Notice
+                            </h4>
+                            <p className="text-gray-300 text-sm leading-relaxed">
+                                Uploaded forms will be available in the public{" "}
+                                <span className="text-white font-semibold">
+                                    "Explore Forms"
+                                </span>{" "}
+                                section for quick access by legal professionals.
+                                Ensure all forms comply with current legal
+                                standards and regulations.
+                            </p>
+                        </div>
                     </div>
-                </div>
+                </div> */}
             </div>
         </div>
     );
