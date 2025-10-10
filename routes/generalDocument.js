@@ -87,7 +87,7 @@ router.get("/:type", async (req, res) => {
         if (type === "0") category = "CriminalLaw";
         else if (type === "1") category = "BareAct";
         else if (type === "2") category = "Event";
-        else if (type === "3") category = "Form";
+        else if (type === "3") category = "Forms";
         else
             return res.status(400).json({
                 message:
