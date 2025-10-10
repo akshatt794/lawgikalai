@@ -29,7 +29,7 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
         }
 
         // Validate category
-        const validCategories = ["BareAct", "CriminalLaw", "Event", "Form"];
+        const validCategories = ["BareAct", "CriminalLaw", "Event", "Forms"];
         if (!validCategories.includes(category)) {
             return res.status(400).json({ error: "Invalid category" });
         }
