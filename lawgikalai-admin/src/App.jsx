@@ -11,7 +11,7 @@ import ExplorePage from "./pages/ExplorePage";
 import UploadOrders from "./pages/UploadOrders";
 import AddJudgesList from "./pages/AddJudgesList";
 import AddBailRoster from "./pages/AddBailRoster";
-import AddBareAct from "./pages/AddBareAct";
+import AddGeneralDocument from "./pages/AddGeneralDocument";
 
 function Navbar() {
     const location = useLocation();
@@ -31,7 +31,7 @@ function Navbar() {
         { path: "/admin/upload-orders", label: "Upload Orders" },
         { path: "/admin/add-bail-roster", label: "Add Bail Roster" },
         { path: "/admin/add-judges", label: "Add Judges" },
-        { path: "/admin/add-bareact", label: "Add Bare Act" },
+        { path: "/admin/add-documents", label: "Add Documents" },
     ];
 
     const isAdminRoute = location.pathname.startsWith("/admin");
@@ -224,7 +224,10 @@ function AppWithNavbar() {
                     element={<AddBailRoster />}
                 />
                 <Route path="/admin/add-judges" element={<AddJudgesList />} />
-                <Route path="/admin/add-bareact" element={<AddBareAct />} />
+                <Route
+                    path="/admin/add-documents"
+                    element={<AddGeneralDocument />}
+                />
             </Routes>
         </>
     );

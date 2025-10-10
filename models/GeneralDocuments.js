@@ -1,12 +1,17 @@
-// models/Bareact.js
+// models/Document.js
 const mongoose = require("mongoose");
 
-const bareactSchema = new mongoose.Schema(
+const documentSchema = new mongoose.Schema(
     {
         title: {
             type: String,
             required: true,
             trim: true,
+        },
+        category: {
+            type: String,
+            required: true,
+            enum: ["BareAct", "CriminalLaw", "Event"],
         },
         file_name: {
             type: String,
@@ -18,8 +23,8 @@ const bareactSchema = new mongoose.Schema(
         },
     },
     {
-        timestamps: true, // Automatically adds createdAt & updatedAt
+        timestamps: true,
     }
 );
 
-module.exports = mongoose.model("Bareact", bareactSchema);
+module.exports = mongoose.model("GeneralDocument", documentSchema);
