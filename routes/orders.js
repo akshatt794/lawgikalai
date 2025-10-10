@@ -488,6 +488,12 @@ router.get("/adv-search", async (req, res) => {
                     ) ||
                 "";
 
+            // ✅ FIX: replace /documents/ with /orders/ in file_url
+            let fileUrl = src.file_url || "";
+            if (fileUrl.includes("/documents/")) {
+                fileUrl = fileUrl.replace("/documents/", "/orders/");
+            }
+
             return {
                 id: hit._id,
                 title: src.title,
