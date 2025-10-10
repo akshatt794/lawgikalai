@@ -87,6 +87,7 @@ router.get("/:type", async (req, res) => {
         if (type === "0") category = "CriminalLaw";
         else if (type === "1") category = "BareAct";
         else if (type === "2") category = "Event";
+        else if (type === "3") category = "Form";
         else
             return res.status(400).json({
                 message:
@@ -102,6 +103,7 @@ router.get("/:type", async (req, res) => {
             BareAct: "Bare Acts Library",
             CriminalLaw: "Criminal Law Resources",
             Event: "Legal Events and Conferences",
+            Form: "Legal Forms",
         };
 
         return res.status(200).json({
