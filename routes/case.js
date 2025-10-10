@@ -103,7 +103,7 @@ router.put("/:caseId", verifyToken, async (req, res) => {
     }
 });
 
-// ✅ Get details of a case by ID (if needed, auth can be re-enabled)
+// ✅ Get details of a case by either Mongo _id or custom case_id
 router.get("/", verifyToken, async (req, res) => {
     try {
         const caseId = req.query.caseId;
@@ -112,23 +112,27 @@ router.get("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Missing caseId parameter" });
         }
 
-        const caseDetails = await Case.findOne({ case_id: caseId });
+        // Try to find by case_id first, then _id
+        const caseDetails =
+            (await Case.findOne({ case_id: caseId })) ||
+            (await Case.findById(caseId));
 
         if (!caseDetails) {
             return res.status(404).json({ error: "Case not found" });
         }
 
         res.json({
-            message: "Case details fetched successfully (by case_id)",
+            message: "Case details fetched successfully",
             data: caseDetails,
         });
     } catch (err) {
         res.status(500).json({
-            error: "Server error while fetching by case_id",
+            error: "Server error while fetching case details",
             details: err.message,
         });
     }
 });
+
 // ✅ Delete a case by case_id (only if user owns it)
 router.delete("/:caseId", verifyToken, async (req, res) => {
     try {
