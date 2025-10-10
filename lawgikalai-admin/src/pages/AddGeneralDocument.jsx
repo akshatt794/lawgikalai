@@ -9,12 +9,15 @@ import {
     AlertCircle,
     BookOpen,
     Scale,
+    CalendarDays,
+    Info,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-export default function AddBareAct() {
+export default function AddGeneralDocument() {
     const [title, setTitle] = useState("");
+    const [category, setCategory] = useState("BareAct");
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState("");
@@ -24,9 +27,7 @@ export default function AddBareAct() {
         setFile(e.target.files[0]);
     };
 
-    const removeFile = () => {
-        setFile(null);
-    };
+    const removeFile = () => setFile(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -34,8 +35,8 @@ export default function AddBareAct() {
         setMsgType("");
         setLoading(true);
 
-        if (!title || !file) {
-            setMsg("Please enter a title and select a file.");
+        if (!title || !file || !category) {
+            setMsg("Please fill all required fields.");
             setMsgType("error");
             setLoading(false);
             return;
@@ -45,10 +46,11 @@ export default function AddBareAct() {
             const token = localStorage.getItem("token");
             const formData = new FormData();
             formData.append("title", title);
-            formData.append("file", file);
+            formData.append("category", category);
+            formData.append("pdf", file);
 
             const { data } = await axios.post(
-                `${API_URL}/api/bareact/upload`,
+                `${API_URL}/api/general-documents/upload`,
                 formData,
                 {
                     headers: {
@@ -58,14 +60,15 @@ export default function AddBareAct() {
                 }
             );
 
-            setMsg(data.message || "Bare Act uploaded successfully!");
+            setMsg(data.message || "Document uploaded successfully!");
             setMsgType("success");
             setTitle("");
+            setCategory("BareAct");
             setFile(null);
         } catch (err) {
             console.error("Upload failed:", err);
             setMsg(
-                err.response?.data?.error ||
+                err.response?.data?.message ||
                     err.message ||
                     "Failed to upload. Please try again."
             );
@@ -75,26 +78,84 @@ export default function AddBareAct() {
         }
     };
 
+    // Dynamic UI colors & icons based on category
+    const categoryStyles = {
+        BareAct: {
+            color: "from-indigo-500 to-purple-600",
+            bgColor: "bg-indigo-500/10",
+            textColor: "text-indigo-400",
+            icon: <BookOpen className="h-10 w-10 text-white" />,
+            smallIcon: <BookOpen className="h-8 w-8 text-indigo-400" />,
+            label: "Bare Act",
+            description: "Legal statutes and acts in their original form",
+            examples: [
+                "Indian Penal Code, 1860",
+                "Code of Criminal Procedure, 1973",
+                "Indian Evidence Act, 1872",
+            ],
+        },
+        CriminalLaw: {
+            color: "from-red-500 to-pink-600",
+            bgColor: "bg-red-500/10",
+            textColor: "text-red-400",
+            icon: <Scale className="h-10 w-10 text-white" />,
+            smallIcon: <Scale className="h-8 w-8 text-red-400" />,
+            label: "Criminal Law",
+            description:
+                "Criminal law documents, judgments, and reference materials",
+            examples: [
+                "Supreme Court Judgments",
+                "Criminal Law Amendments",
+                "Case Studies",
+            ],
+        },
+        Event: {
+            color: "from-amber-500 to-orange-600",
+            bgColor: "bg-amber-500/10",
+            textColor: "text-amber-400",
+            icon: <CalendarDays className="h-10 w-10 text-white" />,
+            smallIcon: <CalendarDays className="h-8 w-8 text-amber-400" />,
+            label: "Event",
+            description: "Legal events, seminars, and conference materials",
+            examples: [
+                "Legal Workshop Materials",
+                "Seminar Proceedings",
+                "Conference Papers",
+            ],
+        },
+    };
+
+    const {
+        color,
+        bgColor,
+        textColor,
+        icon,
+        smallIcon,
+        label,
+        description,
+        examples,
+    } = categoryStyles[category];
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-10">
                     <div className="flex justify-center items-center mb-4">
-                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl shadow-xl">
-                            <BookOpen className="h-10 w-10 text-white" />
+                        <div
+                            className={`bg-gradient-to-br ${color} p-4 rounded-2xl shadow-xl transition-all duration-300`}
+                        >
+                            {icon}
                         </div>
                     </div>
                     <h1 className="text-4xl font-bold text-white mb-2">
-                        Upload Bare Act
+                        Upload {label}
                     </h1>
-                    <p className="text-gray-400 text-lg">
-                        Add legal acts to the database for reference
-                    </p>
+                    <p className="text-gray-400 text-lg">{description}</p>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
                         <div className="flex items-center justify-between">
                             <div>
@@ -102,11 +163,29 @@ export default function AddBareAct() {
                                     Document Type
                                 </p>
                                 <p className="text-xl font-bold text-white">
-                                    Bare Act
+                                    {label}
                                 </p>
                             </div>
-                            <div className="bg-indigo-500/10 p-3 rounded-lg">
-                                <Scale className="h-8 w-8 text-indigo-400" />
+                            <div
+                                className={`${bgColor} p-3 rounded-lg transition-all duration-300`}
+                            >
+                                {smallIcon}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm font-medium mb-1">
+                                    Title Status
+                                </p>
+                                <p className="text-xl font-bold text-white">
+                                    {title ? "Entered" : "Pending"}
+                                </p>
+                            </div>
+                            <div className="bg-blue-500/10 p-3 rounded-lg">
+                                <FileText className="h-8 w-8 text-blue-400" />
                             </div>
                         </div>
                     </div>
@@ -122,40 +201,58 @@ export default function AddBareAct() {
                                 </p>
                             </div>
                             <div className="bg-purple-500/10 p-3 rounded-lg">
-                                <FileText className="h-8 w-8 text-purple-400" />
+                                <Upload className="h-8 w-8 text-purple-400" />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Form */}
+                {/* Upload Form */}
                 <form
                     onSubmit={handleSubmit}
                     className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl shadow-2xl p-8 border border-gray-700/50 space-y-6"
                 >
+                    {/* Category Selector */}
+                    <div>
+                        <label className="block text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wide">
+                            Select Document Type *
+                        </label>
+                        <select
+                            value={category}
+                            onChange={(e) => setCategory(e.target.value)}
+                            className="w-full px-4 py-3 bg-slate-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200 cursor-pointer"
+                        >
+                            <option value="BareAct">Bare Act</option>
+                            <option value="CriminalLaw">Criminal Law</option>
+                            <option value="Event">Event</option>
+                        </select>
+                        <p className="text-gray-500 text-xs mt-2">
+                            Choose the appropriate category for your document
+                        </p>
+                    </div>
+
                     {/* Title Input */}
                     <div>
                         <label className="block text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wide">
-                            Title of the Act *
+                            Document Title *
                         </label>
                         <input
                             type="text"
-                            name="title"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g., Indian Penal Code, 1860"
+                            placeholder={`e.g., ${examples[0]}`}
                             required
                             className="w-full px-4 py-3 bg-slate-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200"
                         />
                         <p className="text-gray-500 text-xs mt-2">
-                            Enter the complete official title of the legal act
+                            Enter the complete official title
                         </p>
                     </div>
 
                     {/* File Upload */}
                     <div>
                         <label className="block text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wide">
-                            PDF Document *
+                            Upload File (PDF) *
                         </label>
 
                         {!file ? (
@@ -174,7 +271,7 @@ export default function AddBareAct() {
                                         PDF files only
                                     </p>
                                     <p className="text-xs text-gray-600">
-                                        Maximum file size: 50MB
+                                        Max file size: 50MB
                                     </p>
                                 </div>
                                 <input
@@ -222,7 +319,7 @@ export default function AddBareAct() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full flex items-center justify-center space-x-2 px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold text-lg shadow-lg hover:shadow-xl"
+                        className={`w-full flex items-center justify-center space-x-2 px-6 py-4 bg-gradient-to-r ${color} text-white rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold text-lg shadow-lg hover:shadow-xl`}
                     >
                         {loading ? (
                             <>
@@ -232,7 +329,7 @@ export default function AddBareAct() {
                         ) : (
                             <>
                                 <Send className="h-5 w-5" />
-                                <span>Upload Bare Act</span>
+                                <span>Upload {label}</span>
                             </>
                         )}
                     </button>
@@ -264,63 +361,33 @@ export default function AddBareAct() {
                     )}
                 </form>
 
-                {/* Info Section */}
-                <div className="mt-8 grid md:grid-cols-2 gap-6">
-                    {/* What are Bare Acts */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                        <h3 className="text-white font-semibold mb-4 flex items-center">
-                            <span className="mr-2">📚</span>
-                            What are Bare Acts?
-                        </h3>
-                        <p className="text-gray-400 text-sm leading-relaxed">
-                            Bare Acts are legal statutes or laws in their
-                            original form without any commentary or
-                            interpretation. They contain the exact text as
-                            enacted by the legislature.
-                        </p>
-                    </div>
-
-                    {/* Guidelines */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                        <h3 className="text-white font-semibold mb-4 flex items-center">
-                            <span className="mr-2">✓</span>
-                            Upload Guidelines
-                        </h3>
-                        <ul className="space-y-2 text-gray-400 text-sm">
-                            <li className="flex items-start">
-                                <span className="text-indigo-400 mr-2">•</span>
-                                <span>Use official act titles</span>
-                            </li>
-                            <li className="flex items-start">
-                                <span className="text-indigo-400 mr-2">•</span>
-                                <span>PDF must be searchable text</span>
-                            </li>
-                            <li className="flex items-start">
-                                <span className="text-indigo-400 mr-2">•</span>
-                                <span>Include year if applicable</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-                {/* Example Banner */}
-                <div className="mt-8 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 backdrop-blur-sm rounded-xl border border-indigo-500/20 p-6">
+                {/* Category Info Card - Dynamic based on selection */}
+                <div
+                    className={`mt-8 bg-gradient-to-r ${color} bg-opacity-10 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6`}
+                >
                     <div className="flex items-start space-x-3">
-                        <div className="bg-indigo-500/20 p-2 rounded-lg flex-shrink-0">
-                            <BookOpen className="h-6 w-6 text-indigo-400" />
+                        <div
+                            className={`${bgColor} p-2 rounded-lg flex-shrink-0`}
+                        >
+                            <Info className={`h-6 w-6 ${textColor}`} />
                         </div>
                         <div>
-                            <h4 className="text-white font-semibold mb-2">
-                                Example Titles
+                            <h4 className="text-white font-semibold mb-3">
+                                Example {label} Titles
                             </h4>
-                            <p className="text-gray-300 text-sm leading-relaxed">
-                                • Indian Penal Code, 1860
-                                <br />
-                                • Code of Criminal Procedure, 1973
-                                <br />
-                                • Indian Evidence Act, 1872
-                                <br />• Constitution of India
-                            </p>
+                            <ul className="space-y-2 text-gray-300 text-sm">
+                                {examples.map((example, index) => (
+                                    <li
+                                        key={index}
+                                        className="flex items-start"
+                                    >
+                                        <span className={`${textColor} mr-2`}>
+                                            •
+                                        </span>
+                                        <span>{example}</span>
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     </div>
                 </div>

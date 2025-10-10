@@ -33,7 +33,7 @@ const courtRoutes = require("./routes/courts");
 const testDocumentDbRoute = require("./routes/test-documentdb");
 const aiDraftingRoutes = require("./routes/aiDrafting");
 const notificationsRoutes = require("./routes/notifications");
-const bareactRoutes = require("./routes/bareact");
+const generalDocumentRoutes = require("./routes/generalDocument");
 const bailRosterRoutes = require("./routes/bailRoster");
 const judgesListRoutes = require("./routes/judgesList");
 const exploreFormRoutes = require("./routes/explore");
@@ -114,7 +114,7 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/test", testDocumentDbRoute);
 // Changed here the route handling
 app.use("/api/courts", causeListRoute);
-app.use("/api/bareact", bareactRoutes);
+app.use("/api/general-document", generalDocumentRoutes);
 
 // 🔌 NEW mounts
 app.use("/api/ddc", ddcRoutes); // UI structure + upload + search over PDFs
@@ -122,7 +122,7 @@ app.use("/api/court-vc", courtVCRoutes); // VC table CRUD/search
 
 app.use("/api/bailroster", bailRosterRoutes);
 app.use("/api/judgelist", judgesListRoutes);
-app.use("/api/explore-form", exploreFormRoutes)
+app.use("/api/explore-form", exploreFormRoutes);
 
 // Health / base
 app.get("/", (_req, res) => {
