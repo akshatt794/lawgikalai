@@ -1,6 +1,8 @@
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+const API_URL = import.meta.env.VITE_API_URL;
+
 import {
     Scale,
     Lock,
@@ -28,10 +30,10 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const res = await axios.post(
-                `http://13.126.80.135:3000/api/auth/login`,
-                { identifier, password }
-            );
+            const res = await axios.post(`${API_URL}/api/auth/login`, {
+                identifier,
+                password,
+            });
             localStorage.setItem("token", res.data.token);
             setMsg("Login successful! Redirecting...");
             setMsgType("success");
