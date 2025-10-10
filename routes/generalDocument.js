@@ -1,24 +1,26 @@
 const express = require("express");
+const router = express.Router();
 const multer = require("multer");
-const AWS = require("aws-sdk");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const GeneralDocument = require("../models/GeneralDocuments");
 
-const router = express.Router();
+// 🔹 Use memory storage for file buffer
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Multer setup
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
-// AWS S3 configuration
-const s3 = new AWS.S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+// 🔹 Initialize AWS S3 v3 client
+const s3 = new S3Client({
     region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
 });
 
 // ✅ Upload Route
 router.post("/upload", upload.single("pdf"), async (req, res) => {
     try {
+        console.log("➡️ General Document upload hit");
+
         const { title, category } = req.body;
         const file = req.file;
 
@@ -32,42 +34,45 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
             return res.status(400).json({ error: "Invalid category" });
         }
 
-        // Define folder name for S3
+        // 🔹 Folder in S3 based on category
         const folder = category.toLowerCase();
-        const key = `${folder}/${Date.now()}_${file.originalname}`;
+        const fileKey = `${folder}/${Date.now()}_${file.originalname.replace(
+            /\s+/g,
+            "_"
+        )}`;
 
-        // ✅ Check file.buffer existence
-        if (!file.buffer) {
-            console.error("❌ File buffer missing. Check multer setup.");
-            return res.status(400).json({ error: "File buffer missing" });
-        }
-
-        // ✅ Upload to S3
-        const uploadParams = {
-            Bucket: process.env.AWS_BUCKET_NAME,
-            Key: key,
+        // 🔹 Upload to S3
+        const params = {
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: fileKey,
             Body: file.buffer,
             ContentType: file.mimetype,
         };
 
-        const s3Response = await s3.upload(uploadParams).promise();
+        await s3.send(new PutObjectCommand(params));
 
-        // ✅ Save to MongoDB
+        // Construct file URL
+        const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+
+        // 🔹 Save to MongoDB
         const newDoc = await GeneralDocument.create({
             title,
             category,
             file_name: file.originalname,
-            file_url: s3Response.Location,
+            file_url: fileUrl,
         });
 
-        res.status(201).json({
+        return res.status(201).json({
             status: true,
-            message: "File uploaded successfully!",
+            message: "✅ File uploaded successfully!",
             data: newDoc,
         });
     } catch (err) {
-        console.error("❌ Upload Error:", err); // <-- This log is key
-        res.status(500).json({ error: "Failed to upload document" });
+        console.error("❌ Upload Error:", err);
+        res.status(500).json({
+            error: "Failed to upload document",
+            details: err.message,
+        });
     }
 });
 
