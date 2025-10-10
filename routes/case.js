@@ -78,23 +78,38 @@ router.get("/list", verifyToken, async (req, res) => {
     }
 });
 
-// ✅ Edit a case by ID (if user owns it)
-router.put("/:caseId", verifyToken, async (req, res) => {
+// ✅ Edit a case by case_id or _id (if user owns it)
+router.put("/", verifyToken, async (req, res) => {
     try {
-        const { caseId } = req.params;
+        const { caseId } = req.query;
 
-        const updated = await Case.findOneAndUpdate(
-            { case_id: caseId, userId: req.user.userId },
-            { $set: req.body },
-            { new: true }
-        );
+        if (!caseId) {
+            return res.status(400).json({ error: "Missing caseId parameter" });
+        }
 
-        if (!updated)
+        // Try updating by custom case_id first, fallback to _id
+        const updated =
+            (await Case.findOneAndUpdate(
+                { case_id: caseId, userId: req.user.userId },
+                { $set: req.body },
+                { new: true }
+            )) ||
+            (await Case.findOneAndUpdate(
+                { _id: caseId, userId: req.user.userId },
+                { $set: req.body },
+                { new: true }
+            ));
+
+        if (!updated) {
             return res
                 .status(404)
-                .json({ error: "Case not found or not allowed" });
+                .json({ error: "Case not found or not authorized to update" });
+        }
 
-        res.json({ message: "Case updated", case: updated });
+        res.json({
+            message: "Case updated successfully",
+            case: updated,
+        });
     } catch (err) {
         res.status(500).json({
             error: "Failed to update case",
@@ -134,9 +149,13 @@ router.get("/", verifyToken, async (req, res) => {
 });
 
 // ✅ Delete a case by case_id (only if user owns it)
-router.delete("/:caseId", verifyToken, async (req, res) => {
+router.delete("/", verifyToken, async (req, res) => {
     try {
-        const { caseId } = req.params;
+        const { caseId } = req.query;
+
+        if (!caseId) {
+            return res.status(400).json({ error: "Missing caseId parameter" });
+        }
 
         const deletedCase = await Case.findOneAndDelete({
             case_id: caseId,
@@ -149,7 +168,10 @@ router.delete("/:caseId", verifyToken, async (req, res) => {
                 .json({ error: "Case not found or not authorized to delete" });
         }
 
-        res.json({ message: "Case deleted successfully", case: deletedCase });
+        res.json({
+            message: "Case deleted successfully",
+            case: deletedCase,
+        });
     } catch (err) {
         res.status(500).json({
             error: "Failed to delete case",
@@ -157,5 +179,4 @@ router.delete("/:caseId", verifyToken, async (req, res) => {
         });
     }
 });
-
 module.exports = router;
