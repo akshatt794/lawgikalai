@@ -32,11 +32,17 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
             return res.status(400).json({ error: "Invalid category" });
         }
 
-        // Define S3 folder based on category
-        const folder = category.toLowerCase(); // e.g. bareact, criminallaw, event
+        // Define folder name for S3
+        const folder = category.toLowerCase();
         const key = `${folder}/${Date.now()}_${file.originalname}`;
 
-        // Upload to S3
+        // ✅ Check file.buffer existence
+        if (!file.buffer) {
+            console.error("❌ File buffer missing. Check multer setup.");
+            return res.status(400).json({ error: "File buffer missing" });
+        }
+
+        // ✅ Upload to S3
         const uploadParams = {
             Bucket: process.env.AWS_BUCKET_NAME,
             Key: key,
@@ -46,7 +52,7 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
 
         const s3Response = await s3.upload(uploadParams).promise();
 
-        // Save to DB
+        // ✅ Save to MongoDB
         const newDoc = await GeneralDocument.create({
             title,
             category,
@@ -60,7 +66,7 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
             data: newDoc,
         });
     } catch (err) {
-        console.error("Upload Error:", err);
+        console.error("❌ Upload Error:", err); // <-- This log is key
         res.status(500).json({ error: "Failed to upload document" });
     }
 });
