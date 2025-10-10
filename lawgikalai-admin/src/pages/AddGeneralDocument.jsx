@@ -50,7 +50,7 @@ export default function AddGeneralDocument() {
             formData.append("pdf", file);
 
             const { data } = await axios.post(
-                `${API_URL}/api/general-documents/upload`,
+                `${API_URL}/api/general-document/upload`,
                 formData,
                 {
                     headers: {
