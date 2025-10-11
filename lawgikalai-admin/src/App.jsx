@@ -24,7 +24,7 @@ function Navbar() {
         { path: "/upload-news", label: "Upload News" },
         // { path: "/all-news", label: "All News" },
         { path: "/users", label: "Users" },
-        { path: "/explore", label: "Explore" },
+        // { path: "/explore", label: "Explore" },
     ];
 
     const adminLinks = [
@@ -217,7 +217,7 @@ function AppWithNavbar() {
                 <Route path="/upload-news" element={<UploadNews />} />
                 <Route path="/all-news" element={<AllNews />} />
                 <Route path="/users" element={<Users />} />
-                <Route path="/explore" element={<ExplorePage />} />
+                {/* <Route path="/explore" element={<ExplorePage />} /> */}
                 <Route path="/admin/upload-orders" element={<UploadOrders />} />
                 <Route
                     path="/admin/add-bail-roster"
