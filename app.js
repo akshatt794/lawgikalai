@@ -52,12 +52,16 @@ const app = express();
 /* ================== MIDDLEWARE ================== */
 
 const allowedOrigins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://lawgikalai-admin.netlify.app",
-    "http://10.0.1.97:5173",
-    "www.lawgikalai.com",
-    "http://3.108.191.82:5174"
+   "http://localhost:5173",
+  "http://localhost:5174",
+  "https://lawgikalai-admin.netlify.app",
+  "https://lawgikalai.com",
+  "http://lawgikalai.com",
+  "https://www.lawgikalai.com",
+  "http://www.lawgikalai.com",
+  "http://10.0.1.97:5173",
+  "http://3.108.191.82:5174",
+  "http://10.0.140.68:4000" // optional internal
 ];
 
 const corsOptions = {
