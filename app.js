@@ -57,6 +57,7 @@ const allowedOrigins = [
     "https://lawgikalai-admin.netlify.app",
     "http://10.0.1.97:5173",
     "www.lawgikalai.com",
+    "http://3.108.191.82:5174"
 ];
 
 const corsOptions = {
