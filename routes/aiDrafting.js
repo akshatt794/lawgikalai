@@ -7,25 +7,34 @@ const openai = new OpenAI({
 });
 
 router.post("/draft", async (req, res) => {
-  const { prompt } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: "Prompt is required" });
-  }
-
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5", // or gpt-4/gpt-4o if enabled
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
+
+    // Set headers for streaming response
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+    res.setHeader("Cache-Control", "no-cache");
+    res.flushHeaders();
+
+    // Stream from OpenAI
+    const stream = await openai.chat.completions.create({
+      model: "gpt-5", // can be gpt-4o-mini if preferred
       messages: [{ role: "user", content: prompt }],
-      // temperature: 0.7, //not supported by gpt 5
+      stream: true,
     });
 
-    const draft = completion.choices[0].message.content;
+    for await (const chunk of stream) {
+      const content = chunk.choices?.[0]?.delta?.content || "";
+      if (content) {
+        res.write(content);
+      }
+    }
 
-    res.json({
-      message: "Prompt generated successfully",
-      draft,
-    });
+    res.end();
   } catch (error) {
     console.error("OpenAI Error:", error);
     res.status(500).json({ error: "Failed to generate legal draft" });
