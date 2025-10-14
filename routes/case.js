@@ -86,22 +86,29 @@ router.put("/", verifyToken, async (req, res) => {
       return res.status(400).json({ error: "Missing caseId parameter" });
     }
 
-    // Fetch existing case first
-    const existingCase = await Case.findOne({
-      $or: [{ case_id: caseId }, { _id: caseId }]
-    });
+    // ✅ Check if caseId is a valid ObjectId
+    const query = mongoose.Types.ObjectId.isValid(caseId)
+      ? { $or: [{ case_id: caseId }, { _id: caseId }] }
+      : { case_id: caseId };
 
+    // Find existing case safely
+    const existingCase = await Case.findOne(query);
     if (!existingCase) {
       return res.status(404).json({ error: "Case not found" });
     }
 
-    // Merge documents safely
+    // ✅ Clean document list
     const newDocs = Array.isArray(req.body.documents) ? req.body.documents : [];
-    const validDocs = newDocs.filter(doc => doc.file_url); // only keep real docs
+    const validDocs = newDocs.map(doc => ({
+      file_name: doc.file_name || doc.name || "",
+      file_url: doc.file_url || doc.url || "",
+      _id: doc._id || doc.id || undefined
+    })).filter(doc => doc.file_url);
 
+    // ✅ Update case fields
     existingCase.set({
       ...req.body,
-      documents: validDocs  // replace with valid array only
+      documents: validDocs
     });
 
     const updated = await existingCase.save();
@@ -112,6 +119,7 @@ router.put("/", verifyToken, async (req, res) => {
     });
 
   } catch (err) {
+    console.error("Update Error:", err);
     res.status(500).json({
       error: "Failed to update case",
       details: err.message
