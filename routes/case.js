@@ -87,30 +87,60 @@ router.put("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Missing caseId parameter" });
         }
 
-        // Try updating by custom case_id first, fallback to _id
-        const updated =
-            (await Case.findOneAndUpdate(
-                { case_id: caseId, userId: req.user.userId },
-                { $set: req.body },
-                { new: true }
-            )) ||
-            (await Case.findOneAndUpdate(
-                { _id: caseId, userId: req.user.userId },
-                { $set: req.body },
-                { new: true }
-            ));
+        // Find existing case by custom case_id or Mongo _id
+        const existingCase =
+            (await Case.findOne({
+                case_id: caseId,
+                userId: req.user.userId,
+            })) ||
+            (await Case.findOne({
+                _id: caseId,
+                userId: req.user.userId,
+            }));
 
-        if (!updated) {
+        if (!existingCase) {
             return res
                 .status(404)
                 .json({ error: "Case not found or not authorized to update" });
         }
 
+        const incoming = req.body || {};
+        const incomingDocs = Array.isArray(incoming.documents)
+            ? incoming.documents
+            : [];
+
+        // ✅ Merge existing + new documents properly
+        const oldDocs = Array.isArray(existingCase.documents)
+            ? existingCase.documents
+            : [];
+
+        const mergedDocuments = [
+            ...oldDocs.filter(
+                (oldDoc) =>
+                    !incomingDocs.some(
+                        (newDoc) =>
+                            newDoc.file_url === oldDoc.file_url ||
+                            newDoc._id?.toString() === oldDoc._id?.toString()
+                    )
+            ),
+            ...incomingDocs,
+        ];
+
+        // ✅ Overwrite everything else safely
+        Object.assign(existingCase, incoming);
+
+        // Replace merged documents back
+        existingCase.documents = mergedDocuments;
+
+        // ✅ Save and respond
+        const updated = await existingCase.save();
+
         res.json({
             message: "Case updated successfully",
-            case: updated,
+            data: updated,
         });
     } catch (err) {
+        console.error("Error updating case:", err);
         res.status(500).json({
             error: "Failed to update case",
             details: err.message,
