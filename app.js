@@ -61,7 +61,9 @@ const allowedOrigins = [
   "http://www.lawgikalai.com",
   "http://10.0.1.97:5173",
   "http://3.108.191.82:5174",
-  "http://10.0.140.68:4000" // optional internal
+  "http://10.0.140.68:4000", // optional internal
+  "https://admin.lawgikalai.com", // ✅ added your new admin panel
+  "http://admin.lawgikalai.com",  
 ];
 
 const corsOptions = {
