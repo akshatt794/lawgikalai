@@ -80,115 +80,6 @@ router.get("/list", verifyToken, async (req, res) => {
 
 // ✅ Edit a case by case_id or _id (if user owns it)
 router.put("/", verifyToken, async (req, res) => {
-    try {
-        const { caseId } = req.query;
-
-        if (!caseId) {
-            return res.status(400).json({ error: "Missing caseId parameter" });
-        }
-
-        // Find existing case by custom case_id or Mongo _id
-        const existingCase =
-            (await Case.findOne({
-                case_id: caseId,
-                userId: req.user.userId,
-            })) ||
-            (await Case.findOne({
-                _id: caseId,
-                userId: req.user.userId,
-            }));
-
-        if (!existingCase) {
-            return res
-                .status(404)
-                .json({ error: "Case not found or not authorized to update" });
-        }
-
-        const incoming = req.body || {};
-        const incomingDocs = Array.isArray(incoming.documents)
-            ? incoming.documents
-            : [];
-
-        // ✅ Merge existing + new documents properly
-        const oldDocs = Array.isArray(existingCase.documents)
-            ? existingCase.documents
-            : [];
-
-        const mergedDocuments = [
-            ...oldDocs.filter(
-                (oldDoc) =>
-                    !incomingDocs.some(
-                        (newDoc) =>
-                            newDoc.file_url === oldDoc.file_url ||
-                            newDoc._id?.toString() === oldDoc._id?.toString()
-                    )
-            ),
-            ...incomingDocs,
-        ];
-
-        // ✅ Overwrite everything else safely
-        Object.assign(existingCase, incoming);
-
-        // Replace merged documents back
-        existingCase.documents = mergedDocuments;
-
-        // ✅ Save and respond
-        const updated = await existingCase.save();
-
-        res.json({
-            message: "Case updated successfully",
-            data: updated,
-        });
-    } catch (err) {
-        console.error("Error updating case:", err);
-        res.status(500).json({
-            error: "Failed to update case",
-            details: err.message,
-        });
-    }
-});
-
-// ✅ Get details of a case by either Mongo _id or custom case_id
-// router.put("/", verifyToken, async (req, res) => {
-//   try {
-//     const { caseId } = req.query;
-//     if (!caseId) {
-//       return res.status(400).json({ error: "Missing caseId parameter" });
-//     }
-
-//     // Fetch existing case first
-//     const existingCase = await Case.findOne({
-//       $or: [{ case_id: caseId }, { _id: caseId }]
-//     });
-
-//     if (!existingCase) {
-//       return res.status(404).json({ error: "Case not found" });
-//     }
-
-//     // Merge documents safely
-//     const newDocs = Array.isArray(req.body.documents) ? req.body.documents : [];
-//     const validDocs = newDocs.filter(doc => doc.file_url); // only keep real docs
-
-//     existingCase.set({
-//       ...req.body,
-//       documents: validDocs  // replace with valid array only
-//     });
-
-//     const updated = await existingCase.save();
-
-//     res.json({
-//       message: "Case updated successfully",
-//       data: updated
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({
-//       error: "Failed to update case",
-//       details: err.message
-//     });
-//   }
-// });
-router.put("/", verifyToken, async (req, res) => {
   try {
     const { caseId } = req.query;
 
@@ -228,6 +119,37 @@ router.put("/", verifyToken, async (req, res) => {
       details: err.message,
     });
   }
+});
+
+
+// ✅ Get details of a case by either Mongo _id or custom case_id
+router.get("/", verifyToken, async (req, res) => {
+    try {
+        const caseId = req.query.caseId;
+
+        if (!caseId) {
+            return res.status(400).json({ error: "Missing caseId parameter" });
+        }
+
+        // Try to find by case_id first, then _id
+        const caseDetails =
+            (await Case.findOne({ case_id: caseId })) ||
+            (await Case.findById(caseId));
+
+        if (!caseDetails) {
+            return res.status(404).json({ error: "Case not found" });
+        }
+
+        res.json({
+            message: "Case details fetched successfully",
+            data: caseDetails,
+        });
+    } catch (err) {
+        res.status(500).json({
+            error: "Server error while fetching case details",
+            details: err.message,
+        });
+    }
 });
 
 
