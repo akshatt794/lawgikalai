@@ -149,33 +149,44 @@ router.put("/", verifyToken, async (req, res) => {
 });
 
 // ✅ Get details of a case by either Mongo _id or custom case_id
-router.get("/", verifyToken, async (req, res) => {
-    try {
-        const caseId = req.query.caseId;
-
-        if (!caseId) {
-            return res.status(400).json({ error: "Missing caseId parameter" });
-        }
-
-        // Try to find by case_id first, then _id
-        const caseDetails =
-            (await Case.findOne({ case_id: caseId })) ||
-            (await Case.findById(caseId));
-
-        if (!caseDetails) {
-            return res.status(404).json({ error: "Case not found" });
-        }
-
-        res.json({
-            message: "Case details fetched successfully",
-            data: caseDetails,
-        });
-    } catch (err) {
-        res.status(500).json({
-            error: "Server error while fetching case details",
-            details: err.message,
-        });
+router.put("/", verifyToken, async (req, res) => {
+  try {
+    const { caseId } = req.query;
+    if (!caseId) {
+      return res.status(400).json({ error: "Missing caseId parameter" });
     }
+
+    // Fetch existing case first
+    const existingCase = await Case.findOne({
+      $or: [{ case_id: caseId }, { _id: caseId }]
+    });
+
+    if (!existingCase) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    // Merge documents safely
+    const newDocs = Array.isArray(req.body.documents) ? req.body.documents : [];
+    const validDocs = newDocs.filter(doc => doc.file_url); // only keep real docs
+
+    existingCase.set({
+      ...req.body,
+      documents: validDocs  // replace with valid array only
+    });
+
+    const updated = await existingCase.save();
+
+    res.json({
+      message: "Case updated successfully",
+      data: updated
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to update case",
+      details: err.message
+    });
+  }
 });
 
 // ✅ Delete a case by case_id (only if user owns it)
