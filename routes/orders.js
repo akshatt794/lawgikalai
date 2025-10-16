@@ -493,17 +493,20 @@ router.get("/adv-search", async (req, res) => {
           ) ||
         "";
 
-      // ✅ FIX: replace /documents/ with /orders/ in file_url
-      let fileUrl = src.file_url || "";
+      // ✅ Safe file URL reconstruction logic
+      const s3Base = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com`;
+      let fileUrl = src.file_url || `${s3Base}/${hit._id}`;
+
+      // Fix any old document links
       if (fileUrl.includes("/documents/")) {
         fileUrl = fileUrl.replace("/documents/", "/orders/");
       }
 
       return {
         id: hit._id,
-        title: src.title,
-        file_url: file_url,
-        uploaded_at: src.uploaded_at,
+        title: src.title || src.file_name || "Untitled",
+        file_url: fileUrl, // ✅ use computed variable, not src.file_url
+        uploaded_at: src.uploaded_at || src.timestamp || null,
         occurrences,
         snippet,
         _score: hit._score,
