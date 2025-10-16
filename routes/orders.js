@@ -502,7 +502,7 @@ router.get("/adv-search", async (req, res) => {
       return {
         id: hit._id,
         title: src.title,
-        file_url: src.file_url,
+        file_url: file_url,
         uploaded_at: src.uploaded_at,
         occurrences,
         snippet,
