@@ -6,10 +6,17 @@ const Order = require("../models/Order");
 const pdfParse = require("pdf-parse");
 const osClient = require("../utils/osClient");
 const path = require("path");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} = require("@aws-sdk/client-s3");
 const crypto = require("crypto");
 const PdfDocument = require("../models/PdfDocument");
 const { verifyToken } = require("../middleware/verifyToken");
+
+// ✅ Utility: Upload to S3 (wrapped for reuse)
+const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 // ✅ OpenSearch PDF Indexing Helper
 async function parseAndIndexPDF(fileBuffer, metadata) {
@@ -31,6 +38,15 @@ async function parseAndIndexPDF(fileBuffer, metadata) {
     body: doc,
     refresh: true,
   });
+}
+
+// Helper: Generate presigned URL (valid 1 hour)
+async function generatePresignedUrl(key) {
+  const command = new GetObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+  });
+  return await getSignedUrl(s3, command, { expiresIn: 3600 });
 }
 
 // ✅ Upload PDF Order (uses S3)
@@ -361,7 +377,7 @@ router.get("/adv-search", async (req, res) => {
   const from = (pageNum - 1) * limitNum;
   const relevanceBool = String(relevance).toLowerCase() !== "false";
 
-  // --- 🔍 Base full-text query ---
+  // --- 🔍 Full-text query ---
   const contentQuery = {
     bool: {
       should: [
@@ -381,22 +397,13 @@ router.get("/adv-search", async (req, res) => {
             default_operator: "AND",
           },
         },
-        // {
-        //     wildcard: {
-        //         content: {
-        //             value: `*${String(query).toLowerCase()}*`,
-        //             case_insensitive: true,
-        //         },
-        //     },
-        // },
       ],
       minimum_should_match: 1,
     },
   };
 
-  // --- 🧠 Add advanced search filters dynamically ---
+  // --- 🧠 Advanced filters ---
   const filters = [];
-
   if (case_type) filters.push({ match_phrase: { case_type } });
   if (case_number) filters.push({ match_phrase: { case_number } });
   if (petitioner) filters.push({ match_phrase: { petitioner } });
@@ -404,7 +411,6 @@ router.get("/adv-search", async (req, res) => {
   if (act) filters.push({ match_phrase: { act } });
   if (section) filters.push({ match_phrase: { section } });
 
-  // --- Combine text search + filters ---
   const combinedQuery = {
     bool: {
       must: [contentQuery],
@@ -412,7 +418,6 @@ router.get("/adv-search", async (req, res) => {
     },
   };
 
-  // --- 🕓 Apply date-based boost when relevance = false ---
   const queryWithDateBoost = {
     function_score: {
       query: combinedQuery,
@@ -421,7 +426,7 @@ router.get("/adv-search", async (req, res) => {
       functions: [
         {
           gauss: {
-            uploaded_at: {
+            timestamp: {
               origin: "now",
               scale: "30d",
               offset: "0d",
@@ -440,7 +445,7 @@ router.get("/adv-search", async (req, res) => {
         type: "number",
         order: "asc",
         script: {
-          source: "Math.abs(doc['uploaded_at'].value.millis - params.now)",
+          source: "Math.abs(doc['timestamp'].value.millis - params.now)",
           params: { now: Date.now() },
         },
       },
@@ -452,19 +457,14 @@ router.get("/adv-search", async (req, res) => {
       query: relevanceBool ? combinedQuery : queryWithDateBoost,
       highlight: {
         fields: {
-          content: {
-            fragment_size: 150,
-            number_of_fragments: 1,
-          },
+          content: { fragment_size: 150, number_of_fragments: 1 },
         },
         pre_tags: ["<mark>"],
         post_tags: ["</mark>"],
       },
     };
 
-    if (!relevanceBool) {
-      body.sort = dateProximitySort;
-    }
+    if (!relevanceBool) body.sort = dateProximitySort;
 
     const result = await osClient.search({
       index: "orders",
@@ -473,63 +473,55 @@ router.get("/adv-search", async (req, res) => {
       body,
     });
 
-    const total =
-      result.body?.hits?.total?.value ?? result.hits?.total?.value ?? 0;
+    const hitsRaw = result.body?.hits?.hits || [];
+    const hits = await Promise.all(
+      hitsRaw.map(async (hit) => {
+        const src = hit._source || {};
+        const content = src.content || "";
 
-    const hitsRaw = result.body?.hits?.hits || result.hits?.hits || [];
+        // ✅ Generate 1-hour presigned URL
+        let fileUrl = null;
+        if (src.s3_key) {
+          try {
+            fileUrl = await generatePresignedUrl(src.s3_key);
+          } catch (err) {
+            console.error(`⚠️ Failed to sign URL for ${src.s3_key}:`, err);
+          }
+        }
 
-    const hits = hitsRaw.map((hit) => {
-      const src = hit._source || {};
-      const content = src.content || "";
-      const regex = new RegExp(query, "gi");
-      const occurrences = (content.match(regex) || []).length;
+        const regex = new RegExp(query, "gi");
+        const occurrences = (content.match(regex) || []).length;
+        const snippet =
+          hit.highlight?.content?.[0] ||
+          content
+            .split(". ")
+            .find((line) =>
+              line.toLowerCase().includes(String(query).toLowerCase())
+            ) ||
+          "";
 
-      const snippet =
-        hit.highlight?.content?.[0] ||
-        content
-          .split(". ")
-          .find((line) =>
-            line.toLowerCase().includes(String(query).toLowerCase())
-          ) ||
-        "";
-
-      // ✅ Safe file URL reconstruction logic
-      const s3Base = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com`;
-      let fileUrl = src.file_url || `${s3Base}/${hit._id}`;
-
-      // Fix any old document links
-      if (fileUrl.includes("/documents/")) {
-        fileUrl = fileUrl.replace("/documents/", "/orders/");
-      }
-
-      return {
-        id: hit._id,
-        title: src.title || src.file_name || "Untitled",
-        file_url: fileUrl, // ✅ use computed variable, not src.file_url
-        uploaded_at: src.uploaded_at || src.timestamp || null,
-        occurrences,
-        snippet,
-        _score: hit._score,
-      };
-    });
-
-    if (relevanceBool) {
-      hits.sort((a, b) => b.occurrences - a.occurrences);
-    }
+        return {
+          id: hit._id,
+          title: src.title || src.file_name,
+          file_url: fileUrl,
+          uploaded_at: src.timestamp,
+          occurrences,
+          snippet,
+          _score: hit._score,
+        };
+      })
+    );
 
     res.json({
       message: "Search fetched successfully",
       page: pageNum,
       limit: limitNum,
-      total,
+      total: result.body.hits.total.value,
       results: hits,
     });
   } catch (error) {
     console.error("❌ Search error:", error);
-    res.status(500).json({
-      error: "Search failed",
-      details: error.message,
-    });
+    res.status(500).json({ error: "Search failed", details: error.message });
   }
 });
 
@@ -551,9 +543,6 @@ router.get("/debug-index", async (req, res) => {
     res.status(500).json({ error: "Search failed" });
   }
 });
-
-// ✅ Utility: Upload to S3 (wrapped for reuse)
-const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 async function uploadToS3(buffer, key, contentType) {
   const params = {
