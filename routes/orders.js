@@ -14,6 +14,7 @@ const {
 const crypto = require("crypto");
 const PdfDocument = require("../models/PdfDocument");
 const { verifyToken } = require("../middleware/verifyToken");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 // ✅ Utility: Upload to S3 (wrapped for reuse)
 const s3 = new S3Client({ region: process.env.AWS_REGION });
