@@ -377,10 +377,17 @@ router.get("/adv-search", async (req, res) => {
   const from = (pageNum - 1) * limitNum;
   const relevanceBool = String(relevance).toLowerCase() !== "false";
 
-  // --- 🔍 Full-text query ---
+  const filters = [];
+  if (case_type) filters.push({ match_phrase: { case_type } });
+  if (case_number) filters.push({ match_phrase: { case_number } });
+  if (petitioner) filters.push({ match_phrase: { petitioner } });
+  if (judge) filters.push({ match_phrase: { judge_name: judge } });
+  if (act) filters.push({ match_phrase: { act } });
+  if (section) filters.push({ match_phrase: { section } });
+
   const contentQuery = {
     bool: {
-      should: [
+      must: [
         {
           match: {
             content: {
@@ -390,105 +397,32 @@ router.get("/adv-search", async (req, res) => {
             },
           },
         },
-        {
-          query_string: {
-            fields: ["content"],
-            query: `*${query}*`,
-            default_operator: "AND",
-          },
-        },
       ],
-      minimum_should_match: 1,
-    },
-  };
-
-  // --- 🧠 Advanced filters ---
-  const filters = [];
-  if (case_type) filters.push({ match_phrase: { case_type } });
-  if (case_number) filters.push({ match_phrase: { case_number } });
-  if (petitioner) filters.push({ match_phrase: { petitioner } });
-  if (judge) filters.push({ match_phrase: { judge_name: judge } });
-  if (act) filters.push({ match_phrase: { act } });
-  if (section) filters.push({ match_phrase: { section } });
-
-  const combinedQuery = {
-    bool: {
-      must: [contentQuery],
       filter: filters,
     },
   };
 
-  const queryWithDateBoost = {
-    function_score: {
-      query: combinedQuery,
-      boost_mode: "multiply",
-      score_mode: "multiply",
-      functions: [
-        {
-          gauss: {
-            timestamp: {
-              origin: "now",
-              scale: "30d",
-              offset: "0d",
-              decay: 0.5,
-            },
-          },
-        },
-      ],
-    },
-  };
-
-  const dateProximitySort = [
-    { _score: "desc" },
-    {
-      _script: {
-        type: "number",
-        order: "asc",
-        script: {
-          source: "Math.abs(doc['timestamp'].value.millis - params.now)",
-          params: { now: Date.now() },
-        },
-      },
-    },
-  ];
-
   try {
-    const body = {
-      query: relevanceBool ? combinedQuery : queryWithDateBoost,
-      highlight: {
-        fields: {
-          content: { fragment_size: 150, number_of_fragments: 1 },
-        },
-        pre_tags: ["<mark>"],
-        post_tags: ["</mark>"],
-      },
-    };
-
-    if (!relevanceBool) body.sort = dateProximitySort;
-
     const result = await osClient.search({
       index: "orders",
       from,
       size: limitNum,
-      body,
+      body: {
+        query: contentQuery,
+        highlight: {
+          fields: { content: { fragment_size: 150, number_of_fragments: 1 } },
+          pre_tags: ["<mark>"],
+          post_tags: ["</mark>"],
+        },
+      },
     });
 
-    const hitsRaw = result.body?.hits?.hits || [];
-    const hits = await Promise.all(
-      hitsRaw.map(async (hit) => {
+    const hits = result.body.hits.hits || [];
+
+    const results = await Promise.all(
+      hits.map(async (hit) => {
         const src = hit._source || {};
         const content = src.content || "";
-
-        // ✅ Generate 1-hour presigned URL
-        let fileUrl = null;
-        if (src.s3_key) {
-          try {
-            fileUrl = await generatePresignedUrl(src.s3_key);
-          } catch (err) {
-            console.error(`⚠️ Failed to sign URL for ${src.s3_key}:`, err);
-          }
-        }
-
         const regex = new RegExp(query, "gi");
         const occurrences = (content.match(regex) || []).length;
         const snippet =
@@ -500,13 +434,23 @@ router.get("/adv-search", async (req, res) => {
             ) ||
           "";
 
+        // Generate 1-hour presigned URL if s3_key exists
+        let file_url = null;
+        if (src.s3_key) {
+          const command = new GetObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: src.s3_key,
+          });
+          file_url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
+        }
+
         return {
           id: hit._id,
-          title: src.title || src.file_name,
-          file_url: fileUrl,
-          uploaded_at: src.timestamp,
+          title: src.title || src.file_name || "Untitled",
+          file_url,
           occurrences,
           snippet,
+          uploaded_at: src.timestamp,
           _score: hit._score,
         };
       })
@@ -517,11 +461,14 @@ router.get("/adv-search", async (req, res) => {
       page: pageNum,
       limit: limitNum,
       total: result.body.hits.total.value,
-      results: hits,
+      results,
     });
   } catch (error) {
     console.error("❌ Search error:", error);
-    res.status(500).json({ error: "Search failed", details: error.message });
+    res.status(500).json({
+      error: "Search failed",
+      details: error.message,
+    });
   }
 });
 
