@@ -13,549 +13,554 @@ const { verifyToken } = require("../middleware/verifyToken");
 
 // ✅ OpenSearch PDF Indexing Helper
 async function parseAndIndexPDF(fileBuffer, metadata) {
-    const data = await pdfParse(fileBuffer);
+  const data = await pdfParse(fileBuffer);
 
-    const doc = {
-        title: metadata.title,
-        file_name: metadata.fileName,
-        file_url: metadata.fileUrl,
-        content: data.text,
-        createdAt: metadata.createdAt,
-        uploaded_by: metadata.userId || "anonymous",
-        uploaded_at: new Date().toISOString(),
-    };
+  const doc = {
+    title: metadata.title,
+    file_name: metadata.fileName,
+    file_url: metadata.fileUrl,
+    content: data.text,
+    createdAt: metadata.createdAt,
+    uploaded_by: metadata.userId || "anonymous",
+    uploaded_at: new Date().toISOString(),
+  };
 
-    return await osClient.index({
-        index: "orders",
-        id: metadata.orderId,
-        body: doc,
-        refresh: true,
-    });
+  return await osClient.index({
+    index: "orders",
+    id: metadata.orderId,
+    body: doc,
+    refresh: true,
+  });
 }
 
 // ✅ Upload PDF Order (uses S3)
 router.post("/upload", upload.single("order"), async (req, res) => {
-    try {
-        console.log("➡️ Upload route hit");
+  try {
+    console.log("➡️ Upload route hit");
 
-        if (!req.file) {
-            return res.status(400).json({ error: "No PDF uploaded" });
-        }
-
-        const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(
-            /\s+/g,
-            "_"
-        )}`;
-
-        await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
-
-        const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
-        const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(
-            fileUrl
-        )}`;
-
-        const newOrder = new Order({
-            title: req.body.title || "Untitled",
-            file_name: req.file.originalname,
-            file_url: embedUrl,
-        });
-
-        const savedOrder = await newOrder.save();
-
-        await parseAndIndexPDF(req.file.buffer, {
-            orderId: savedOrder._id.toString(),
-            title: savedOrder.title,
-            fileName: savedOrder.file_name,
-            fileUrl: fileUrl,
-            createdAt: savedOrder.createdAt,
-            userId: req.user?.id,
-        });
-
-        res.json({
-            message: "Order uploaded and saved successfully!",
-            order: savedOrder,
-        });
-    } catch (err) {
-        console.error("❌ Upload error:", err);
-        res.status(500).json({
-            error: "Something broke!",
-            details: err.message,
-        });
+    if (!req.file) {
+      return res.status(400).json({ error: "No PDF uploaded" });
     }
+
+    const s3Key = `orders/${Date.now()}_${req.file.originalname.replace(
+      /\s+/g,
+      "_"
+    )}`;
+
+    await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
+
+    const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+    const embedUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(
+      fileUrl
+    )}`;
+
+    const newOrder = new Order({
+      title: req.body.title || "Untitled",
+      file_name: req.file.originalname,
+      file_url: embedUrl,
+    });
+
+    const savedOrder = await newOrder.save();
+
+    await parseAndIndexPDF(req.file.buffer, {
+      orderId: savedOrder._id.toString(),
+      title: savedOrder.title,
+      fileName: savedOrder.file_name,
+      fileUrl: fileUrl,
+      createdAt: savedOrder.createdAt,
+      userId: req.user?.id,
+    });
+
+    res.json({
+      message: "Order uploaded and saved successfully!",
+      order: savedOrder,
+    });
+  } catch (err) {
+    console.error("❌ Upload error:", err);
+    res.status(500).json({
+      error: "Something broke!",
+      details: err.message,
+    });
+  }
 });
 
 // ✅ Upload Single PDF (Cloudinary)
 router.post(
-    "/upload-document",
-    verifyToken,
-    upload.single("document"),
-    async (req, res) => {
-        try {
-            const cloudinary = require("../config/cloudinary");
-            const result = await cloudinary.uploader.upload(req.file.path, {
-                resource_type: "raw",
-            });
+  "/upload-document",
+  verifyToken,
+  upload.single("document"),
+  async (req, res) => {
+    try {
+      const cloudinary = require("../config/cloudinary");
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+      });
 
-            res.json({
-                message: "File uploaded successfully",
-                file_name: req.file.originalname,
-                file_url: result.secure_url,
-            });
-        } catch (err) {
-            res.status(500).json({
-                error: "Upload failed",
-                details: err.message,
-            });
-        }
+      res.json({
+        message: "File uploaded successfully",
+        file_name: req.file.originalname,
+        file_url: result.secure_url,
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: "Upload failed",
+        details: err.message,
+      });
     }
+  }
 );
 
 // Upload PDF (S3) & Index Content
 // Upload PDF (S3) & Index Content (Mongo + OpenSearch); response unchanged
 router.post("/upload-pdf", upload.single("document"), async (req, res) => {
-    try {
-        if (!req.file)
-            return res.status(400).json({ error: "No document uploaded" });
+  try {
+    if (!req.file)
+      return res.status(400).json({ error: "No document uploaded" });
 
-        // Upload to S3
-        const key = `documents/${crypto.randomUUID()}_${req.file.originalname.replace(
-            /\s+/g,
-            "_"
-        )}`;
-        await uploadToS3(req.file.buffer, key, "application/pdf");
-        const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    // Upload to S3
+    const key = `documents/${crypto.randomUUID()}_${req.file.originalname.replace(
+      /\s+/g,
+      "_"
+    )}`;
+    await uploadToS3(req.file.buffer, key, "application/pdf");
+    const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
-        // Parse and save to Mongo
-        const parsed = await pdfParse(req.file.buffer);
-        const doc = new PdfDocument({
-            title: req.file.originalname,
-            file_url: fileUrl,
-            content: parsed.text,
-        });
-        await doc.save();
+    // Parse and save to Mongo
+    const parsed = await pdfParse(req.file.buffer);
+    const doc = new PdfDocument({
+      title: req.file.originalname,
+      file_url: fileUrl,
+      content: parsed.text,
+    });
+    await doc.save();
 
-        // Index to OpenSearch so the message remains truthful and /search finds it
-        await osClient.index({
-            index: "orders",
-            id: doc._id.toString(),
-            body: {
-                title: doc.title,
-                file_name: req.file.originalname,
-                file_url: fileUrl,
-                content: parsed.text,
-                createdAt: doc.createdAt,
-                uploaded_by: req.user?.id || "anonymous",
-                uploaded_at: new Date().toISOString(),
-            },
-            refresh: true,
-        });
+    // Index to OpenSearch so the message remains truthful and /search finds it
+    await osClient.index({
+      index: "orders",
+      id: doc._id.toString(),
+      body: {
+        title: doc.title,
+        file_name: req.file.originalname,
+        file_url: fileUrl,
+        content: parsed.text,
+        createdAt: doc.createdAt,
+        uploaded_by: req.user?.id || "anonymous",
+        uploaded_at: new Date().toISOString(),
+      },
+      refresh: true,
+    });
 
-        // ⬇️ Response kept EXACTLY the same as before
-        return res.json({
-            message: "PDF uploaded and indexed successfully!",
-            document: {
-                title: doc.title,
-                file_url: doc.file_url,
-                uploaded_at: doc.uploaded_at,
-            },
-        });
-    } catch (err) {
-        console.error("❌ Upload error (/upload-pdf):", err);
-        res.status(500).json({ error: "Upload failed", details: err.message });
-    }
+    // ⬇️ Response kept EXACTLY the same as before
+    return res.json({
+      message: "PDF uploaded and indexed successfully!",
+      document: {
+        title: doc.title,
+        file_url: doc.file_url,
+        uploaded_at: doc.uploaded_at,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Upload error (/upload-pdf):", err);
+    res.status(500).json({ error: "Upload failed", details: err.message });
+  }
 });
 
 // ✅ Get Orders by optional title
 router.get("/", async (req, res) => {
-    try {
-        const { title } = req.query;
-        const query = title
-            ? { title: { $regex: new RegExp(title, "i") } }
-            : {};
-        const orders = await Order.find(query).sort({ createdAt: -1 });
+  try {
+    const { title } = req.query;
+    const query = title ? { title: { $regex: new RegExp(title, "i") } } : {};
+    const orders = await Order.find(query).sort({ createdAt: -1 });
 
-        res.json({
-            message: "Orders fetched successfully",
-            count: orders.length,
-            data: orders,
-        });
-    } catch (err) {
-        console.error("❌ Error fetching orders:", err);
-        res.status(500).json({
-            error: "Failed to fetch orders",
-            details: err.message,
-        });
-    }
+    res.json({
+      message: "Orders fetched successfully",
+      count: orders.length,
+      data: orders,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching orders:", err);
+    res.status(500).json({
+      error: "Failed to fetch orders",
+      details: err.message,
+    });
+  }
 });
 
 // 🔍 Enhanced PDF search with snippet
 router.get("/search", async (req, res) => {
-    const { query, page = 1, limit = 10, relevance = "true" } = req.query;
+  const { query, page = 1, limit = 10, relevance = "true" } = req.query;
 
-    if (!query) return res.status(400).json({ error: "Missing search query" });
+  if (!query) return res.status(400).json({ error: "Missing search query" });
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const from = (pageNum - 1) * limitNum;
-    const relevanceBool = String(relevance).toLowerCase() !== "false"; // true unless explicitly "false"
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  const from = (pageNum - 1) * limitNum;
+  const relevanceBool = String(relevance).toLowerCase() !== "false"; // true unless explicitly "false"
 
-    // Base content query (case-insensitive + fuzzy)
-    const contentQuery = {
-        bool: {
-            should: [
-                {
-                    match: {
-                        content: {
-                            query: query,
-                            operator: "and",
-                            fuzziness: "AUTO",
-                        },
-                    },
-                },
-                {
-                    wildcard: {
-                        content: {
-                            value: `*${String(query).toLowerCase()}*`,
-                            case_insensitive: true,
-                        },
-                    },
-                },
-            ],
-            minimum_should_match: 1,
-        },
-    };
-
-    // If relevance=false, boost by proximity to "now" using a gaussian decay on the date field.
-    // Tune `scale` to how quickly the date influence should fall off (e.g., "30d" → ~month window).
-    const queryWithDateBoost = {
-        function_score: {
-            query: contentQuery,
-            boost_mode: "multiply",
-            score_mode: "multiply",
-            functions: [
-                {
-                    gauss: {
-                        uploaded_at: {
-                            origin: "now",
-                            scale: "30d",
-                            offset: "0d",
-                            decay: 0.5,
-                        },
-                    },
-                },
-            ],
-        },
-    };
-
-    // For an unmistakable “closest to now” ordering when relevance=false,
-    // we also add a secondary sort using a script that measures absolute time distance from now.
-    const dateProximitySort = [
-        { _score: "desc" },
+  // Base content query (case-insensitive + fuzzy)
+  const contentQuery = {
+    bool: {
+      should: [
         {
-            _script: {
-                type: "number",
-                order: "asc",
-                script: {
-                    source: "Math.abs(doc['uploaded_at'].value.millis - params.now)",
-                    params: { now: Date.now() },
-                },
+          match: {
+            content: {
+              query: query,
+              operator: "and",
+              fuzziness: "AUTO",
             },
+          },
         },
-    ];
-
-    try {
-        const body = {
-            // If relevance=true → plain content query; else → content + date boost
-            query: relevanceBool ? contentQuery : queryWithDateBoost,
-            highlight: {
-                fields: {
-                    content: {
-                        fragment_size: 150,
-                        number_of_fragments: 1,
-                    },
-                },
-                pre_tags: ["<mark>"],
-                post_tags: ["</mark>"],
+        {
+          wildcard: {
+            content: {
+              value: `*${String(query).toLowerCase()}*`,
+              case_insensitive: true,
             },
-        };
+          },
+        },
+      ],
+      minimum_should_match: 1,
+    },
+  };
 
-        if (!relevanceBool) {
-            body.sort = dateProximitySort;
-        }
+  // If relevance=false, boost by proximity to "now" using a gaussian decay on the date field.
+  // Tune `scale` to how quickly the date influence should fall off (e.g., "30d" → ~month window).
+  const queryWithDateBoost = {
+    function_score: {
+      query: contentQuery,
+      boost_mode: "multiply",
+      score_mode: "multiply",
+      functions: [
+        {
+          gauss: {
+            uploaded_at: {
+              origin: "now",
+              scale: "30d",
+              offset: "0d",
+              decay: 0.5,
+            },
+          },
+        },
+      ],
+    },
+  };
 
-        const result = await osClient.search({
-            index: "orders",
-            from,
-            size: limitNum,
-            body,
-        });
+  // For an unmistakable “closest to now” ordering when relevance=false,
+  // we also add a secondary sort using a script that measures absolute time distance from now.
+  const dateProximitySort = [
+    { _score: "desc" },
+    {
+      _script: {
+        type: "number",
+        order: "asc",
+        script: {
+          source: "Math.abs(doc['uploaded_at'].value.millis - params.now)",
+          params: { now: Date.now() },
+        },
+      },
+    },
+  ];
 
-        const total =
-            result.body?.hits?.total?.value ?? result.hits?.total?.value ?? 0;
+  try {
+    const body = {
+      // If relevance=true → plain content query; else → content + date boost
+      query: relevanceBool ? contentQuery : queryWithDateBoost,
+      highlight: {
+        fields: {
+          content: {
+            fragment_size: 150,
+            number_of_fragments: 1,
+          },
+        },
+        pre_tags: ["<mark>"],
+        post_tags: ["</mark>"],
+      },
+    };
 
-        const hitsRaw = result.body?.hits?.hits || result.hits?.hits || [];
-
-        const hits = hitsRaw.map((hit) => {
-            const src = hit._source || {};
-            const content = src.content || "";
-            const regex = new RegExp(query, "gi");
-            const occurrences = (content.match(regex) || []).length;
-
-            const snippet =
-                hit.highlight?.content?.[0] ||
-                content
-                    .split(". ")
-                    .find((line) =>
-                        line.toLowerCase().includes(String(query).toLowerCase())
-                    ) ||
-                "";
-
-            return {
-                id: hit._id,
-                title: src.title,
-                file_url: src.file_url,
-                uploaded_at: src.uploaded_at,
-                occurrences,
-                snippet,
-                _score: hit._score,
-            };
-        });
-
-        // Keep your frequency tie‑breaker when relevance=true (content‑first).
-        if (relevanceBool) {
-            hits.sort((a, b) => b.occurrences - a.occurrences);
-        }
-        // When relevance=false, ordering already comes from ES/OpenSearch (score + date proximity).
-
-        res.json({
-            message: "Search fetched successfully",
-            page: pageNum,
-            limit: limitNum,
-            total,
-            results: hits,
-        });
-    } catch (error) {
-        console.error("❌ Search error:", error);
-        res.status(500).json({ error: "Search failed" });
+    if (!relevanceBool) {
+      body.sort = dateProximitySort;
     }
+
+    const result = await osClient.search({
+      index: "orders",
+      from,
+      size: limitNum,
+      body,
+    });
+
+    const total =
+      result.body?.hits?.total?.value ?? result.hits?.total?.value ?? 0;
+
+    const hitsRaw = result.body?.hits?.hits || result.hits?.hits || [];
+
+    const hits = hitsRaw.map((hit) => {
+      const src = hit._source || {};
+      const content = src.content || "";
+      const regex = new RegExp(query, "gi");
+      const occurrences = (content.match(regex) || []).length;
+
+      const snippet =
+        hit.highlight?.content?.[0] ||
+        content
+          .split(". ")
+          .find((line) =>
+            line.toLowerCase().includes(String(query).toLowerCase())
+          ) ||
+        "";
+
+      return {
+        id: hit._id,
+        title: src.title,
+        file_url: src.file_url,
+        uploaded_at: src.uploaded_at,
+        occurrences,
+        snippet,
+        _score: hit._score,
+      };
+    });
+
+    // Keep your frequency tie‑breaker when relevance=true (content‑first).
+    if (relevanceBool) {
+      hits.sort((a, b) => b.occurrences - a.occurrences);
+    }
+    // When relevance=false, ordering already comes from ES/OpenSearch (score + date proximity).
+
+    res.json({
+      message: "Search fetched successfully",
+      page: pageNum,
+      limit: limitNum,
+      total,
+      results: hits,
+    });
+  } catch (error) {
+    console.error("❌ Search error:", error);
+    res.status(500).json({ error: "Search failed" });
+  }
 });
 
 // Enhanced Result for AdvancedSearch
 // 🔍 Enhanced PDF search with snippet + advanced filters
 router.get("/adv-search", async (req, res) => {
-    const {
-        query,
-        page = 1,
-        limit = 10,
-        relevance = "true",
-        case_type,
-        case_number,
-        petitioner,
-        judge,
-        act,
-        section,
-    } = req.query;
+  const {
+    query,
+    page = 1,
+    limit = 10,
+    relevance = "true",
+    case_type,
+    case_number,
+    petitioner,
+    judge,
+    act,
+    section,
+  } = req.query;
 
-    if (!query) return res.status(400).json({ error: "Missing search query" });
+  if (!query) return res.status(400).json({ error: "Missing search query" });
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const from = (pageNum - 1) * limitNum;
-    const relevanceBool = String(relevance).toLowerCase() !== "false";
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  const from = (pageNum - 1) * limitNum;
+  const relevanceBool = String(relevance).toLowerCase() !== "false";
 
-    // --- 🔍 Base full-text query ---
-    const contentQuery = {
-        bool: {
-            should: [
-                {
-                    match: {
-                        content: {
-                            query,
-                            operator: "and",
-                            fuzziness: "AUTO",
-                        },
-                    },
-                },
-                {
-                    wildcard: {
-                        content: {
-                            value: `*${String(query).toLowerCase()}*`,
-                            case_insensitive: true,
-                        },
-                    },
-                },
-            ],
-            minimum_should_match: 1,
-        },
-    };
-
-    // --- 🧠 Add advanced search filters dynamically ---
-    const filters = [];
-
-    if (case_type) filters.push({ match_phrase: { case_type } });
-    if (case_number) filters.push({ match_phrase: { case_number } });
-    if (petitioner) filters.push({ match_phrase: { petitioner } });
-    if (judge) filters.push({ match_phrase: { judge_name: judge } });
-    if (act) filters.push({ match_phrase: { act } });
-    if (section) filters.push({ match_phrase: { section } });
-
-    // --- Combine text search + filters ---
-    const combinedQuery = {
-        bool: {
-            must: [contentQuery],
-            filter: filters,
-        },
-    };
-
-    // --- 🕓 Apply date-based boost when relevance = false ---
-    const queryWithDateBoost = {
-        function_score: {
-            query: combinedQuery,
-            boost_mode: "multiply",
-            score_mode: "multiply",
-            functions: [
-                {
-                    gauss: {
-                        uploaded_at: {
-                            origin: "now",
-                            scale: "30d",
-                            offset: "0d",
-                            decay: 0.5,
-                        },
-                    },
-                },
-            ],
-        },
-    };
-
-    const dateProximitySort = [
-        { _score: "desc" },
+  // --- 🔍 Base full-text query ---
+  const contentQuery = {
+    bool: {
+      should: [
         {
-            _script: {
-                type: "number",
-                order: "asc",
-                script: {
-                    source: "Math.abs(doc['uploaded_at'].value.millis - params.now)",
-                    params: { now: Date.now() },
-                },
+          match: {
+            content: {
+              query,
+              operator: "and",
+              fuzziness: "AUTO",
             },
+          },
         },
-    ];
+        {
+          query_string: {
+            fields: ["content"],
+            query: `*${query}*`,
+            default_operator: "AND",
+          },
+        },
+        // {
+        //     wildcard: {
+        //         content: {
+        //             value: `*${String(query).toLowerCase()}*`,
+        //             case_insensitive: true,
+        //         },
+        //     },
+        // },
+      ],
+      minimum_should_match: 1,
+    },
+  };
 
-    try {
-        const body = {
-            query: relevanceBool ? combinedQuery : queryWithDateBoost,
-            highlight: {
-                fields: {
-                    content: {
-                        fragment_size: 150,
-                        number_of_fragments: 1,
-                    },
-                },
-                pre_tags: ["<mark>"],
-                post_tags: ["</mark>"],
+  // --- 🧠 Add advanced search filters dynamically ---
+  const filters = [];
+
+  if (case_type) filters.push({ match_phrase: { case_type } });
+  if (case_number) filters.push({ match_phrase: { case_number } });
+  if (petitioner) filters.push({ match_phrase: { petitioner } });
+  if (judge) filters.push({ match_phrase: { judge_name: judge } });
+  if (act) filters.push({ match_phrase: { act } });
+  if (section) filters.push({ match_phrase: { section } });
+
+  // --- Combine text search + filters ---
+  const combinedQuery = {
+    bool: {
+      must: [contentQuery],
+      filter: filters,
+    },
+  };
+
+  // --- 🕓 Apply date-based boost when relevance = false ---
+  const queryWithDateBoost = {
+    function_score: {
+      query: combinedQuery,
+      boost_mode: "multiply",
+      score_mode: "multiply",
+      functions: [
+        {
+          gauss: {
+            uploaded_at: {
+              origin: "now",
+              scale: "30d",
+              offset: "0d",
+              decay: 0.5,
             },
-        };
+          },
+        },
+      ],
+    },
+  };
 
-        if (!relevanceBool) {
-            body.sort = dateProximitySort;
-        }
+  const dateProximitySort = [
+    { _score: "desc" },
+    {
+      _script: {
+        type: "number",
+        order: "asc",
+        script: {
+          source: "Math.abs(doc['uploaded_at'].value.millis - params.now)",
+          params: { now: Date.now() },
+        },
+      },
+    },
+  ];
 
-        const result = await osClient.search({
-            index: "orders",
-            from,
-            size: limitNum,
-            body,
-        });
+  try {
+    const body = {
+      query: relevanceBool ? combinedQuery : queryWithDateBoost,
+      highlight: {
+        fields: {
+          content: {
+            fragment_size: 150,
+            number_of_fragments: 1,
+          },
+        },
+        pre_tags: ["<mark>"],
+        post_tags: ["</mark>"],
+      },
+    };
 
-        const total =
-            result.body?.hits?.total?.value ?? result.hits?.total?.value ?? 0;
-
-        const hitsRaw = result.body?.hits?.hits || result.hits?.hits || [];
-
-        const hits = hitsRaw.map((hit) => {
-            const src = hit._source || {};
-            const content = src.content || "";
-            const regex = new RegExp(query, "gi");
-            const occurrences = (content.match(regex) || []).length;
-
-            const snippet =
-                hit.highlight?.content?.[0] ||
-                content
-                    .split(". ")
-                    .find((line) =>
-                        line.toLowerCase().includes(String(query).toLowerCase())
-                    ) ||
-                "";
-
-            // ✅ FIX: replace /documents/ with /orders/ in file_url
-            let fileUrl = src.file_url || "";
-            if (fileUrl.includes("/documents/")) {
-                fileUrl = fileUrl.replace("/documents/", "/orders/");
-            }
-
-            return {
-                id: hit._id,
-                title: src.title,
-                file_url: src.file_url,
-                uploaded_at: src.uploaded_at,
-                occurrences,
-                snippet,
-                _score: hit._score,
-            };
-        });
-
-        if (relevanceBool) {
-            hits.sort((a, b) => b.occurrences - a.occurrences);
-        }
-
-        res.json({
-            message: "Search fetched successfully",
-            page: pageNum,
-            limit: limitNum,
-            total,
-            results: hits,
-        });
-    } catch (error) {
-        console.error("❌ Search error:", error);
-        res.status(500).json({
-            error: "Search failed",
-            details: error.message,
-        });
+    if (!relevanceBool) {
+      body.sort = dateProximitySort;
     }
+
+    const result = await osClient.search({
+      index: "orders",
+      from,
+      size: limitNum,
+      body,
+    });
+
+    const total =
+      result.body?.hits?.total?.value ?? result.hits?.total?.value ?? 0;
+
+    const hitsRaw = result.body?.hits?.hits || result.hits?.hits || [];
+
+    const hits = hitsRaw.map((hit) => {
+      const src = hit._source || {};
+      const content = src.content || "";
+      const regex = new RegExp(query, "gi");
+      const occurrences = (content.match(regex) || []).length;
+
+      const snippet =
+        hit.highlight?.content?.[0] ||
+        content
+          .split(". ")
+          .find((line) =>
+            line.toLowerCase().includes(String(query).toLowerCase())
+          ) ||
+        "";
+
+      // ✅ FIX: replace /documents/ with /orders/ in file_url
+      let fileUrl = src.file_url || "";
+      if (fileUrl.includes("/documents/")) {
+        fileUrl = fileUrl.replace("/documents/", "/orders/");
+      }
+
+      return {
+        id: hit._id,
+        title: src.title,
+        file_url: src.file_url,
+        uploaded_at: src.uploaded_at,
+        occurrences,
+        snippet,
+        _score: hit._score,
+      };
+    });
+
+    if (relevanceBool) {
+      hits.sort((a, b) => b.occurrences - a.occurrences);
+    }
+
+    res.json({
+      message: "Search fetched successfully",
+      page: pageNum,
+      limit: limitNum,
+      total,
+      results: hits,
+    });
+  } catch (error) {
+    console.error("❌ Search error:", error);
+    res.status(500).json({
+      error: "Search failed",
+      details: error.message,
+    });
+  }
 });
 
 // 🐞 Debug: View indexed OpenSearch documents
 router.get("/debug-index", async (req, res) => {
-    try {
-        const response = await osClient.search({
-            index: "orders",
-            body: {
-                query: { match_all: {} },
-                size: 10,
-            },
-        });
+  try {
+    const response = await osClient.search({
+      index: "orders",
+      body: {
+        query: { match_all: {} },
+        size: 10,
+      },
+    });
 
-        const results = response.body.hits.hits.map((hit) => hit._source);
-        res.json(results);
-    } catch (error) {
-        console.error("❌ OpenSearch error:", error);
-        res.status(500).json({ error: "Search failed" });
-    }
+    const results = response.body.hits.hits.map((hit) => hit._source);
+    res.json(results);
+  } catch (error) {
+    console.error("❌ OpenSearch error:", error);
+    res.status(500).json({ error: "Search failed" });
+  }
 });
 
 // ✅ Utility: Upload to S3 (wrapped for reuse)
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 async function uploadToS3(buffer, key, contentType) {
-    const params = {
-        Bucket: process.env.S3_BUCKET_NAME,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-    };
+  const params = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  };
 
-    return await s3.send(new PutObjectCommand(params));
+  return await s3.send(new PutObjectCommand(params));
 }
 
 module.exports = router;
