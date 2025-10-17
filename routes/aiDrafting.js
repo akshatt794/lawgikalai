@@ -11,7 +11,7 @@ const openai = new OpenAI({
 // ✅ Add verifyToken middleware to identify user
 router.post("/draft", verifyToken, async (req, res) => {
   const { prompt } = req.body;
-  const userId = req.user?.id;
+  const userId = req.user.userId || req.user.id || req.user._id;
 
   if (!prompt) {
     return res.status(400).json({ error: "Prompt is required" });
