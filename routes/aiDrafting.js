@@ -1,20 +1,46 @@
 const express = require("express");
 const router = express.Router();
 const { OpenAI } = require("openai");
+const { verifyToken } = require("../middleware/verifyToken");
+const User = require("../models/User"); // 👈 import your user model
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-router.post("/draft", async (req, res) => {
+// ✅ Add verifyToken middleware to identify user
+router.post("/draft", verifyToken, async (req, res) => {
   const { prompt } = req.body;
+  const userId = req.user?.id;
 
   if (!prompt) {
     return res.status(400).json({ error: "Prompt is required" });
   }
 
   try {
-    // ✅ Setup Server-Sent Events headers for live streaming
+    // ✅ Find user
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // ✅ Check & reset daily usage
+    const today = new Date().toDateString();
+    if (user.lastPromptDate !== today) {
+      user.dailyPromptCount = 0;
+      user.lastPromptDate = today;
+    }
+
+    // ✅ Enforce 5 prompts/day limit
+    if (user.dailyPromptCount >= 5) {
+      return res
+        .status(429)
+        .json({ error: "Daily AI draft limit reached (5 prompts/day)." });
+    }
+
+    // ✅ Increment usage
+    user.dailyPromptCount += 1;
+    await user.save();
+
+    // ✅ Setup streaming headers
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -29,18 +55,17 @@ router.post("/draft", async (req, res) => {
 
     for await (const chunk of stream) {
       const content = chunk.choices?.[0]?.delta?.content || "";
-      if (content) {
-        res.write(content);
-      }
+      if (content) res.write(content);
     }
 
-    res.end(); // ✅ Close connection after stream ends
+    res.end();
   } catch (error) {
     console.error("OpenAI Error:", error);
     if (!res.headersSent) {
-      res
-        .status(500)
-        .json({ error: "Failed to generate legal draft", details: error.message });
+      res.status(500).json({
+        error: "Failed to generate legal draft",
+        details: error.message,
+      });
     } else {
       res.end("Error: Unable to complete request.");
     }
