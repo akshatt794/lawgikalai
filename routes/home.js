@@ -1,47 +1,55 @@
 // routes/home.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const mongoose = require('mongoose');
-const Announcement = require('../models/Announcement');
-const Case = require('../models/Case');
-const News = require('../models/News');
-const { verifyToken } = require('../middleware/verifyToken');
+const mongoose = require("mongoose");
+const Announcement = require("../models/Announcement");
+const Case = require("../models/Case");
+const News = require("../models/News");
+const { verifyToken } = require("../middleware/verifyToken");
 
 // ===== AWS (optional presign) =====
-const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-south-1';
+const REGION =
+  process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-south-1";
 const BUCKET =
   process.env.S3_BUCKET_NAME ||
   process.env.AWS_S3_BUCKET ||
   process.env.AWS_BUCKET_NAME ||
-  '';
+  "";
 
 const S3_PUBLIC_BASE =
-  process.env.S3_PUBLIC_BASE || (BUCKET ? `https://${BUCKET}.s3.${REGION}.amazonaws.com` : '');
+  process.env.S3_PUBLIC_BASE ||
+  (BUCKET ? `https://${BUCKET}.s3.${REGION}.amazonaws.com` : "");
 
-const FORCE_SIGNED = String(process.env.S3_FORCE_SIGNED || '').toLowerCase() === 'true';
+const FORCE_SIGNED =
+  String(process.env.S3_FORCE_SIGNED || "").toLowerCase() === "true";
 
 let s3, getSignedUrl, GetObjectCommand;
 if (FORCE_SIGNED && BUCKET) {
-  const { S3Client, GetObjectCommand: _GetObjectCommand } = require('@aws-sdk/client-s3');
-  ({ getSignedUrl } = require('@aws-sdk/s3-request-presigner'));
+  const {
+    S3Client,
+    GetObjectCommand: _GetObjectCommand,
+  } = require("@aws-sdk/client-s3");
+  ({ getSignedUrl } = require("@aws-sdk/s3-request-presigner"));
   GetObjectCommand = _GetObjectCommand;
   s3 = new S3Client({ region: REGION });
 }
 
-const BASE_URL = process.env.BASE_URL || 'https://lawgikalai-auth-api.onrender.com';
+const BASE_URL =
+  process.env.BASE_URL || "https://lawgikalai-auth-api.onrender.com";
 
 // -------- helpers --------
 function pickRawImage(n) {
   if (!n) return null;
   if (Array.isArray(n.images) && n.images.length) {
     const first = n.images[0];
-    if (typeof first === 'string') return first;
-    if (first && typeof first === 'object') return first.secure_url || first.url || first.path || null;
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object")
+      return first.secure_url || first.url || first.path || null;
   }
   return (
     n.image?.secure_url ||
     n.image?.url ||
-    (typeof n.image === 'string' ? n.image : null) ||
+    (typeof n.image === "string" ? n.image : null) ||
     n.imageUrl ||
     n.fileUrl ||
     n.thumbnailUrl ||
@@ -54,7 +62,7 @@ function extractS3KeyFromUrl(u) {
   try {
     const parsed = new URL(u);
     if (BUCKET && parsed.hostname.startsWith(`${BUCKET}.s3`)) {
-      return decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+      return decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
     }
     return null;
   } catch {
@@ -65,7 +73,7 @@ function extractS3KeyFromUrl(u) {
 async function toAwsCompatibleUrl(raw) {
   if (!raw) return null;
 
-  if (raw.startsWith('/uploads')) return `${BASE_URL}${raw}`;
+  if (raw.startsWith("/uploads")) return `${BASE_URL}${raw}`;
 
   if (/^https?:\/\//i.test(raw)) {
     if (FORCE_SIGNED && BUCKET) {
@@ -81,11 +89,11 @@ async function toAwsCompatibleUrl(raw) {
     return raw;
   }
 
-  if (raw.startsWith('s3://')) {
+  if (raw.startsWith("s3://")) {
     try {
-      const [, , rest] = raw.split('/');
-      const [bucketCandidate, ...parts] = rest.split('/');
-      const key = parts.join('/');
+      const [, , rest] = raw.split("/");
+      const [bucketCandidate, ...parts] = rest.split("/");
+      const key = parts.join("/");
       if (!BUCKET || bucketCandidate !== BUCKET) return raw;
       if (FORCE_SIGNED) {
         return await getSignedUrl(
@@ -101,7 +109,7 @@ async function toAwsCompatibleUrl(raw) {
   }
 
   if (BUCKET) {
-    const bareKey = raw.replace(/^\//, '');
+    const bareKey = raw.replace(/^\//, "");
     if (FORCE_SIGNED) {
       return await getSignedUrl(
         s3,
@@ -122,30 +130,35 @@ function safeDateExpr(jsonPath) {
       vars: { raw: jsonPath },
       in: {
         $cond: [
-          { $eq: [{ $type: '$$raw' }, 'date'] },
-          '$$raw',
+          { $eq: [{ $type: "$$raw" }, "date"] },
+          "$$raw",
           {
             $cond: [
               {
                 $and: [
-                  { $eq: [{ $type: '$$raw' }, 'string'] },
-                  { $regexMatch: { input: '$$raw', regex: /^\d{4}-\d{2}-\d{2}/ } }
-                ]
+                  { $eq: [{ $type: "$$raw" }, "string"] },
+                  {
+                    $regexMatch: {
+                      input: "$$raw",
+                      regex: /^\d{4}-\d{2}-\d{2}/,
+                    },
+                  },
+                ],
               },
-              { $dateFromString: { dateString: '$$raw' } },
-              null
-            ]
-          }
-        ]
-      }
-    }
+              { $dateFromString: { dateString: "$$raw" } },
+              null,
+            ],
+          },
+        ],
+      },
+    },
   };
 }
 
 // ========== GET /api/home ==========
-router.get('/', verifyToken, async (req, res) => {
+router.get("/", verifyToken, async (req, res) => {
   try {
-    const userId = String(req.user.userId || '');
+    const userId = String(req.user.userId || "");
     const now = new Date();
 
     const oid = mongoose.Types.ObjectId.isValid(userId)
@@ -153,10 +166,7 @@ router.get('/', verifyToken, async (req, res) => {
       : null;
 
     const userMatch = {
-      $or: [
-        ...(oid ? [{ userId: oid }] : []),
-        { userId }
-      ]
+      $or: [...(oid ? [{ userId: oid }] : []), { userId }],
     };
 
     const announcementsPromise = Announcement.find({})
@@ -172,47 +182,76 @@ router.get('/', verifyToken, async (req, res) => {
     const totalPromise = Case.countDocuments(userMatch);
     const closedPromise = Case.countDocuments({
       ...userMatch,
-      case_status: { $regex: /^closed$/i }
+      case_status: { $regex: /^closed$/i },
     });
 
     const upcomingAggPromise = Case.aggregate([
       { $match: userMatch },
-      { $unwind: '$hearing_details' },
-      { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
+      { $unwind: "$hearing_details" },
+      {
+        $addFields: {
+          _hd_next: safeDateExpr("$hearing_details.next_hearing_date"),
+        },
+      },
       { $match: { _hd_next: { $ne: null, $gte: now } } },
-      { $group: { _id: '$_id' } },
-      { $count: 'count' }
+      { $group: { _id: "$_id" } },
+      { $count: "count" },
     ]);
 
-    const [announcements, rawNews, total, closed, upcomingAgg] = await Promise.all([
-      announcementsPromise,
-      rawNewsPromise,
-      totalPromise,
-      closedPromise,
-      upcomingAggPromise
-    ]);
+    const [announcements, rawNews, total, closed, upcomingAgg] =
+      await Promise.all([
+        announcementsPromise,
+        rawNewsPromise,
+        totalPromise,
+        closedPromise,
+        upcomingAggPromise,
+      ]);
 
     const upcoming = upcomingAgg?.[0]?.count || 0;
 
     // nearest case
     let nearestCaseDoc = await Case.aggregate([
       { $match: userMatch },
-      { $unwind: '$hearing_details' },
-      { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
+      { $unwind: "$hearing_details" },
+      {
+        $addFields: {
+          _hd_next: safeDateExpr("$hearing_details.next_hearing_date"),
+        },
+      },
       { $match: { _hd_next: { $ne: null, $gte: now } } },
       { $sort: { _hd_next: 1 } },
-      { $project: { _id: 1, case_title: 1, court_name: 1, 'hearing_details.time': 1, 'hearing_details.next_hearing_date': '$_hd_next' } },
-      { $limit: 1 }
+      {
+        $project: {
+          _id: 1,
+          case_title: 1,
+          court_name: 1,
+          "hearing_details.time": 1,
+          "hearing_details.next_hearing_date": "$_hd_next",
+        },
+      },
+      { $limit: 1 },
     ]);
     if (!nearestCaseDoc[0]) {
       nearestCaseDoc = await Case.aggregate([
         { $match: userMatch },
-        { $unwind: '$hearing_details' },
-        { $addFields: { _hd_next: safeDateExpr('$hearing_details.next_hearing_date') } },
+        { $unwind: "$hearing_details" },
+        {
+          $addFields: {
+            _hd_next: safeDateExpr("$hearing_details.next_hearing_date"),
+          },
+        },
         { $match: { _hd_next: { $ne: null, $lte: now } } },
         { $sort: { _hd_next: -1 } },
-        { $project: { _id: 1, case_title: 1, court_name: 1, 'hearing_details.time': 1, 'hearing_details.next_hearing_date': '$_hd_next' } },
-        { $limit: 1 }
+        {
+          $project: {
+            _id: 1,
+            case_title: 1,
+            court_name: 1,
+            "hearing_details.time": 1,
+            "hearing_details.next_hearing_date": "$_hd_next",
+          },
+        },
+        { $limit: 1 },
       ]);
     }
     const nearest_case = nearestCaseDoc[0] || null;
@@ -227,24 +266,25 @@ router.get('/', verifyToken, async (req, res) => {
           category: n.category,
           source: n.source,
           createdAt: n.createdAt,
-          image
+          image,
         };
       })
     );
 
     return res.json({
-      message: 'Home data fetched',
+      message: "Home data fetched",
       announcements,
       nearest_case,
       stats: { total, upcoming, closed },
-      news
+      news,
     });
   } catch (err) {
-    console.error('❌ Home route error:', err);
-    return res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("❌ Home route error:", err);
+    return res
+      .status(500)
+      .json({ error: "Server error", details: err.message });
   }
 });
-
 
 router.get("/policies/:type", (req, res) => {
   const { type } = req.params; // comes as string
@@ -252,7 +292,7 @@ router.get("/policies/:type", (req, res) => {
   const policies = {
     0: {
       title: "Terms and Conditions",
-      content: `Welcome to LawgicalAi. By accessing or using our application, you agree to the following Terms and Conditions:
+      content: `Welcome to LawgicalAI. By accessing or using our application, you agree to the following Terms and Conditions:
 
 1. **Use of Service**  
    LawgicalAi is designed to help legal professionals manage and organize client case data. You agree to use the platform only for lawful purposes and in compliance with all applicable laws and regulations.
@@ -284,12 +324,12 @@ router.get("/policies/:type", (req, res) => {
    LawgicalAi may update these Terms from time to time. Continued use of the app after such updates constitutes acceptance of the revised Terms.  
 
 If you do not agree with these Terms, please discontinue using the application immediately.
-  `
+  `,
     },
     1: {
       title: "Privacy Policy",
       content: `
-At LawgicalAi, we respect your privacy and are committed to protecting the confidentiality of your information. This Privacy Policy explains how we collect, use, and safeguard your data.
+At LawgicalAI, we respect your privacy and are committed to protecting the confidentiality of your information. This Privacy Policy explains how we collect, use, and safeguard your data.
 
 1. **Information We Collect**  
    - **Account Information**: Name, email address, and login credentials.  
@@ -330,13 +370,13 @@ At LawgicalAi, we respect your privacy and are committed to protecting the confi
 9. **Contact Us**  
    If you have questions or concerns about this Privacy Policy, please contact us at:  
    **support@lawgikalai.com**
-  `
+  `,
     },
 
     2: {
       title: "Refund Policy",
       content: `
-At LawgicalAi, we strive to provide a reliable and valuable service for legal professionals. This Refund Policy explains when and how refunds are processed.
+At LawgicalAI, we strive to provide a reliable and valuable service for legal professionals. This Refund Policy explains when and how refunds are processed.
 
 1. **Subscription Plans**  
    - Payments for subscription plans (monthly, yearly, or otherwise) are non-refundable once the billing cycle begins.  
@@ -364,13 +404,13 @@ At LawgicalAi, we strive to provide a reliable and valuable service for legal pr
 
 If you have any questions about this Refund Policy, please contact us at:  
 **support@lawgicalai.com**
-  `
-    }, 
-    3:{
+  `,
+    },
+    3: {
       title: "High Court Calender",
-      content: "https://lawgikalai-bucket.s3.ap-south-1.amazonaws.com/documents/high-court-calender.jpg"
-    }
-
+      content:
+        "https://lawgikalai-bucket.s3.ap-south-1.amazonaws.com/documents/high-court-calender.jpg",
+    },
   };
 
   if (type in policies) {
