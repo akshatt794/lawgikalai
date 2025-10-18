@@ -392,7 +392,7 @@ At LawgicalAI, we strive to provide a reliable and valuable service for legal pr
    - Legal requirements that mandate a refund.  
 
 4. **Refund Request Process**  
-   - To request a refund, please contact our support team at **support@lawgicalai.com** within **7 days** of the transaction.  
+   - To request a refund, please contact our support team at **management@lawgicalai.com** within **7 days** of the transaction.  
    - All requests will be reviewed, and approved refunds will be processed back to the original payment method within **7–14 business days**.  
 
 5. **Free Trials and Promotional Offers**  
