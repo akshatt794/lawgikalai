@@ -295,7 +295,7 @@ router.get("/policies/:type", (req, res) => {
       content: `Welcome to LawgicalAI. By accessing or using our application, you agree to the following Terms and Conditions:
 
 1. **Use of Service**  
-   LawgicalAi is designed to help legal professionals manage and organize client case data. You agree to use the platform only for lawful purposes and in compliance with all applicable laws and regulations.
+   LawgicalAI is designed to help legal professionals manage and organize client case data. You agree to use the platform only for lawful purposes and in compliance with all applicable laws and regulations.
 
 2. **User Responsibilities**  
    - You are solely responsible for the accuracy, completeness, and legality of the information you upload.  
@@ -304,24 +304,24 @@ router.get("/policies/:type", (req, res) => {
 
 3. **Data Ownership and Confidentiality**  
    - All data you input remains your property.  
-   - LawgicalAi will not access, disclose, or share your case data except as required by law or with your consent.  
+   - LawgicalAI will not access, disclose, or share your case data except as required by law or with your consent.  
    - You are responsible for maintaining appropriate confidentiality with respect to your clients.  
 
 4. **Disclaimer**  
-   LawgicalAi does not provide legal advice. The app is a productivity tool and should not be considered a substitute for professional judgment or legal counsel.  
+   LawgicalAI does not provide legal advice. The app is a productivity tool and should not be considered a substitute for professional judgment or legal counsel.  
 
 5. **Account and Security**  
    - You are responsible for safeguarding your account credentials.  
    - LawgicalAi is not liable for unauthorized access resulting from your failure to secure your account.  
 
 6. **Limitation of Liability**  
-   To the maximum extent permitted by law, LawgicalAi and its operators are not liable for any damages, losses, or consequences arising from the use of the platform, including but not limited to data loss or unauthorized access.  
+   To the maximum extent permitted by law, LawgicalAI and its operators are not liable for any damages, losses, or consequences arising from the use of the platform, including but not limited to data loss or unauthorized access.  
 
 7. **Termination**  
    We reserve the right to suspend or terminate accounts that violate these Terms.  
 
 8. **Changes to Terms**  
-   LawgicalAi may update these Terms from time to time. Continued use of the app after such updates constitutes acceptance of the revised Terms.  
+   LawgicalAI may update these Terms from time to time. Continued use of the app after such updates constitutes acceptance of the revised Terms.  
 
 If you do not agree with these Terms, please discontinue using the application immediately.
   `,
@@ -365,11 +365,11 @@ At LawgicalAI, we respect your privacy and are committed to protecting the confi
    - Deleted case data is permanently removed from our systems within a reasonable timeframe.  
 
 8. **Changes to Privacy Policy**  
-   We may update this Privacy Policy from time to time. Continued use of LawgicalAi constitutes acceptance of the revised policy.  
+   We may update this Privacy Policy from time to time. Continued use of LawgicalAI constitutes acceptance of the revised policy.  
 
 9. **Contact Us**  
    If you have questions or concerns about this Privacy Policy, please contact us at:  
-   **support@lawgikalai.com**
+   **management@lawgikalai.com**
   `,
     },
 
@@ -403,7 +403,7 @@ At LawgicalAI, we strive to provide a reliable and valuable service for legal pr
    LawgicalAi reserves the right to update this Refund Policy from time to time. Any changes will be communicated through the app or website.  
 
 If you have any questions about this Refund Policy, please contact us at:  
-**support@lawgicalai.com**
+**management@lawgicalai.com**
   `,
     },
     3: {
