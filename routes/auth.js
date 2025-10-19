@@ -635,6 +635,42 @@ router.get('/sessions', verifyToken, async (req, res) => {
 });
 
 // ===============================================
+// 🟡 CHECK ACTIVE SESSIONS WITHOUT TOKEN (for blocked 3rd device login)
+// ===============================================
+router.post("/sessions/check", async (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+
+    if (!identifier || !password) {
+      return res.status(400).json({ error: "Identifier and password are required" });
+    }
+
+    // ✅ Find user by identifier (email or phone)
+    const user = await User.findOne({ identifier });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // ✅ Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
+
+    // ✅ Return current sessions safely
+    const sessions = (user.activeSessions || []).map((session, index) => ({
+      id: index + 1,
+      device: session.device || "Unknown Device",
+      createdAt: session.createdAt,
+    }));
+
+    res.json({
+      message: "Active sessions fetched successfully",
+      sessions,
+    });
+  } catch (err) {
+    console.error("Session check error:", err);
+    res.status(500).json({ error: "Failed to check sessions", details: err.message });
+  }
+});
+
+// ===============================================
 // 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
 // ===============================================
 router.post('/sessions/logout', verifyToken, async (req, res) => {
