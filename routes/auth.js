@@ -1,11 +1,11 @@
-require('dotenv').config();
+require("dotenv").config();
 const { generateOtp, sendCodeByEmail } = require("../utils/emailservice");
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const News = require('../models/News');
-const { verifyToken } = require('../middleware/verifyToken');
+const express = require("express");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const News = require("../models/News");
+const { verifyToken } = require("../middleware/verifyToken");
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -14,42 +14,44 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_OPTIONS = {
   httpOnly: true,
   // For cross-site frontends (different domain/port), 'none' is required & must be secure
-  sameSite: 'none',
+  sameSite: "none",
   secure: false, // requires HTTPS in prod
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/',
+  path: "/",
 };
 
 const auth = (req, res, next) => {
   const header = req.headers.authorization;
-  console.log(header)
-  if (!header) return res.status(401).json({ error: 'Missing token' });
+  console.log(header);
+  if (!header) return res.status(401).json({ error: "Missing token" });
 
-  const token = header.split(' ')[1];
+  const token = header.split(" ")[1];
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: "Invalid token" });
   }
 };
 
 //LOGIN
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { identifier, password, deviceInfo } = req.body;
     const user = await User.findOne({ identifier });
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     if (!user.isVerified) {
-      return res.status(401).json({ error: 'Account not verified. Please check your OTP.' });
+      return res
+        .status(401)
+        .json({ error: "Account not verified. Please check your OTP." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
 
     // ✅ Clean up expired sessions (optional safety)
-    user.activeSessions = (user.activeSessions || []).filter(session => {
+    user.activeSessions = (user.activeSessions || []).filter((session) => {
       try {
         jwt.verify(session.token, JWT_SECRET);
         return true;
@@ -61,17 +63,20 @@ router.post('/login', async (req, res) => {
     // ✅ Enforce 2-device limit
     if (user.activeSessions.length >= 2) {
       return res.status(403).json({
-        error: 'You are already logged in on 2 devices. Please log out from one before logging in again.',
+        error:
+          "You are already logged in on 2 devices. Please log out from one before logging in again.",
       });
     }
 
     // ✅ Generate token
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     // ✅ Save device session
     user.activeSessions.push({
       token,
-      device: deviceInfo || req.headers['user-agent'] || "Unknown Device",
+      device: deviceInfo || req.headers["user-agent"] || "Unknown Device",
       createdAt: new Date(),
     });
     await user.save();
@@ -87,17 +92,17 @@ router.post('/login', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // SIGNUP
-router.post('/signup', async (req, res) => {
+router.post("/signup", async (req, res) => {
   try {
     const { fullName, identifier, password, mobileNumber } = req.body;
     if (!fullName || !identifier || !password || !mobileNumber) {
-      return res.status(400).json({ error: 'All fields are required' });
+      return res.status(400).json({ error: "All fields are required" });
     }
 
     // Hash password early
@@ -107,7 +112,9 @@ router.post('/signup', async (req, res) => {
     let existingUser = await User.findOne({ mobileNumber });
     if (existingUser) {
       if (existingUser.isVerified) {
-        return res.status(409).json({ error: 'User with this mobile number already exists' });
+        return res
+          .status(409)
+          .json({ error: "User with this mobile number already exists" });
       } else {
         // user exists but not verified → resend OTP
         const otp = generateOtp();
@@ -124,7 +131,7 @@ router.post('/signup', async (req, res) => {
           message: "Signup successful. OTP sent to email.",
           user_id: existingUser._id,
           mobileNumber: existingUser.mobileNumber,
-          requires_verification: true
+          requires_verification: true,
         });
       }
     }
@@ -135,7 +142,9 @@ router.post('/signup', async (req, res) => {
       if (existingUser.isVerified) {
         const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
         return res.status(409).json({
-          error: `User with this ${isEmail ? 'email' : 'identifier'} already exists`
+          error: `User with this ${
+            isEmail ? "email" : "identifier"
+          } already exists`,
         });
       } else {
         // user exists but not verified → resend OTP
@@ -153,14 +162,19 @@ router.post('/signup', async (req, res) => {
           message: "Signup successful. OTP sent to email.",
           user_id: existingUser._id,
           mobileNumber: existingUser.mobileNumber,
-          requires_verification: true
+          requires_verification: true,
         });
       }
     }
 
     // 3) If no existing user → create new one
-    const user = new User({ fullName, identifier, password: hash, mobileNumber });
-    console.log("Please help "+identifier);
+    const user = new User({
+      fullName,
+      identifier,
+      password: hash,
+      mobileNumber,
+    });
+    console.log("Please help " + identifier);
     const otp = generateOtp();
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
@@ -172,22 +186,21 @@ router.post('/signup', async (req, res) => {
       message: "Signup successful. OTP sent to email.",
       user_id: user._id,
       mobileNumber: user.mobileNumber,
-      requires_verification: true
+      requires_verification: true,
     });
   } catch (err) {
-    console.error('Signup error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Signup error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
-
 // FORGOT PASSWORD
-router.post('/forgot-password', async (req, res) => {
+router.post("/forgot-password", async (req, res) => {
   try {
     const { identifier } = req.body;
 
     if (!identifier) {
-      return res.status(400).json({ error: 'Identifier is required' });
+      return res.status(400).json({ error: "Identifier is required" });
     }
 
     // Determine if identifier is email or mobile number
@@ -200,13 +213,13 @@ router.post('/forgot-password', async (req, res) => {
     } else if (isMobile) {
       query = { mobileNumber: identifier };
     } else {
-      return res.status(400).json({ error: 'Invalid identifier format' });
+      return res.status(400).json({ error: "Invalid identifier format" });
     }
 
     let user = await User.findOne(query);
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Generate OTP
@@ -222,32 +235,36 @@ router.post('/forgot-password', async (req, res) => {
     console.log(`Forgot-password OTP for ${user.identifier}: ${otp}`);
 
     return res.json({
-      message: `OTP sent to ${isEmail ? 'email' : 'mobile'} for password reset.`,
+      message: `OTP sent to ${
+        isEmail ? "email" : "mobile"
+      } for password reset.`,
       user_id: user._id,
       requires_verification: !user.isVerified, // true if user not verified
-      token
+      token,
     });
   } catch (err) {
-    console.error('Forgot password error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Forgot password error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
-router.post('/confirm-password', verifyToken, async (req, res) => {
+router.post("/confirm-password", verifyToken, async (req, res) => {
   try {
     const { newPassword, token } = req.body;
 
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedNewPassword;
     await user.save();
 
-    res.json({ message: 'Password changed successfully', token });
+    res.json({ message: "Password changed successfully", token });
   } catch (err) {
-    console.error('Change password error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message, token });
+    console.error("Change password error:", err);
+    res
+      .status(500)
+      .json({ error: "Server error", details: err.message, token });
   }
 });
 
@@ -303,55 +320,57 @@ router.post('/confirm-password', verifyToken, async (req, res) => {
 // });
 
 // CHANGE PASSWORD
-router.put('/change-password', verifyToken, async (req, res) => {
+router.put("/change-password", verifyToken, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
 
     if (!oldPassword || !newPassword) {
-      return res.status(400).json({ error: 'Old and new passwords are required' });
+      return res
+        .status(400)
+        .json({ error: "Old and new passwords are required" });
     }
 
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Old password is incorrect' });
+      return res.status(401).json({ error: "Old password is incorrect" });
     }
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedNewPassword;
     await user.save();
 
-    res.json({ message: 'Password changed successfully' });
+    res.json({ message: "Password changed successfully" });
   } catch (err) {
-    console.error('Change password error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Change password error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // VERIFY OTP
-router.post('/verify-otp', async (req, res) => {
+router.post("/verify-otp", async (req, res) => {
   try {
     const { user_id, otp } = req.body;
     console.log(req.body);
     if (!user_id || !otp) {
-      return res.status(400).json({ error: 'User ID and OTP are required' });
+      return res.status(400).json({ error: "User ID and OTP are required" });
     }
 
     const user = await User.findById(user_id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     // if (user.isVerified) {
     //   return res.json({ message: 'User already verified.' });
     // }
 
     if (user.otp !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+      return res.status(400).json({ error: "Invalid OTP" });
     }
 
     if (user.otpExpires < Date.now()) {
-      return res.status(400).json({ error: 'OTP expired' });
+      return res.status(400).json({ error: "OTP expired" });
     }
 
     // Mark user as verified
@@ -369,47 +388,57 @@ router.post('/verify-otp', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        mobileNumber: user.mobileNumber
-      }
+        mobileNumber: user.mobileNumber,
+      },
     });
   } catch (err) {
-    console.error('OTP verification error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("OTP verification error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
-
 // RESEND OTP
-router.post('/resend-otp', async (req, res) => {
+router.post("/resend-otp", async (req, res) => {
   try {
     const { user_id } = req.body;
     const user = await User.findById(user_id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const otp = '123456';
+    const otp = "123456";
     user.otp = otp;
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
     console.log(`OTP for ${user.identifier}: ${otp}`);
-    res.json({ message: 'OTP resent to email.' });
+    res.json({ message: "OTP resent to email." });
   } catch (err) {
-    console.error('Resend OTP error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Resend OTP error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // GET PROFILE
-router.get('/profile', verifyToken, async (req, res) => {
+router.get("/profile", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const practiceAreas = Array.isArray(user.practiceArea) ? user.practiceArea : [];
-    const possibleAreas = ["Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration", "Others"];
+    const practiceAreas = Array.isArray(user.practiceArea)
+      ? user.practiceArea
+      : [];
+    const possibleAreas = [
+      "Criminal",
+      "Civil",
+      "Family",
+      "Property",
+      "Corporate",
+      "IncomeTax",
+      "Arbitration",
+      "Others",
+    ];
 
     const practice_areas = {};
-    possibleAreas.forEach(area => {
+    possibleAreas.forEach((area) => {
       practice_areas[area] = practiceAreas.includes(area);
     });
 
@@ -420,7 +449,7 @@ router.get('/profile', verifyToken, async (req, res) => {
       bar_council_id: user.barCouncilId,
       qualification: user.qualification,
       experience: user.experience,
-      practice_areas
+      practice_areas,
     });
   } catch (err) {
     res.status(500).json({ error: "Server error", details: err.message });
@@ -428,29 +457,39 @@ router.get('/profile', verifyToken, async (req, res) => {
 });
 
 // UPDATE PROFILE
-router.put('/profile', verifyToken, async (req, res) => {
+router.put("/profile", verifyToken, async (req, res) => {
   try {
     const {
-      full_name, mobile_number, email, bar_council_id,
-      qualification, experience, practiceArea, practice_areas
+      full_name,
+      mobile_number,
+      email,
+      bar_council_id,
+      qualification,
+      experience,
+      practiceArea,
+      practice_areas,
     } = req.body;
 
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ message: "User not found", status: false });
+    if (!user)
+      return res.status(404).json({ message: "User not found", status: false });
 
-    if (full_name || req.body.fullName) user.fullName = full_name || req.body.fullName;
-    if (mobile_number || req.body.mobileNumber) user.mobileNumber = mobile_number || req.body.mobileNumber;
+    if (full_name || req.body.fullName)
+      user.fullName = full_name || req.body.fullName;
+    if (mobile_number || req.body.mobileNumber)
+      user.mobileNumber = mobile_number || req.body.mobileNumber;
     if (email) user.email = email;
-    if (bar_council_id || req.body.barCouncilId) user.barCouncilId = bar_council_id || req.body.barCouncilId;
+    if (bar_council_id || req.body.barCouncilId)
+      user.barCouncilId = bar_council_id || req.body.barCouncilId;
     if (qualification) user.qualification = qualification;
     if (experience) user.experience = experience;
 
     let practiceAreaArray = user.practiceArea || [];
     if (Array.isArray(practiceArea)) {
       practiceAreaArray = practiceArea;
-    } else if (practice_areas && typeof practice_areas === 'object') {
+    } else if (practice_areas && typeof practice_areas === "object") {
       practiceAreaArray = [];
-      Object.keys(practice_areas).forEach(area => {
+      Object.keys(practice_areas).forEach((area) => {
         if (practice_areas[area]) practiceAreaArray.push(area);
       });
     }
@@ -458,14 +497,23 @@ router.put('/profile', verifyToken, async (req, res) => {
 
     await user.save();
 
-    const areaList = Array.from(new Set([
-      ...Object.keys(practice_areas || {}),
-      ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
-      "Criminal", "Civil", "Family", "Property", "Corporate", "IncomeTax", "Arbitration", "Others"
-    ]));
+    const areaList = Array.from(
+      new Set([
+        ...Object.keys(practice_areas || {}),
+        ...(Array.isArray(user.practiceArea) ? user.practiceArea : []),
+        "Criminal",
+        "Civil",
+        "Family",
+        "Property",
+        "Corporate",
+        "IncomeTax",
+        "Arbitration",
+        "Others",
+      ])
+    );
 
     const resultPracticeAreas = {};
-    areaList.forEach(area => {
+    areaList.forEach((area) => {
       resultPracticeAreas[area] = user.practiceArea.includes(area);
     });
 
@@ -479,75 +527,83 @@ router.put('/profile', verifyToken, async (req, res) => {
         bar_council_id: user.barCouncilId || "",
         qualification: user.qualification || "",
         experience: user.experience || "",
-        practice_areas: resultPracticeAreas
-      }
+        practice_areas: resultPracticeAreas,
+      },
     });
   } catch (err) {
-    res.status(500).json({ message: "Failed to update profile", status: false, error: err.message });
+    res
+      .status(500)
+      .json({
+        message: "Failed to update profile",
+        status: false,
+        error: err.message,
+      });
   }
 });
 
 // DELETE PROFILE
-router.delete('/profile', verifyToken, async (req, res) => {
+router.delete("/profile", verifyToken, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.user.userId);
-    res.json({ message: 'Profile deleted' });
+    res.json({ message: "Profile deleted" });
   } catch (err) {
-    console.error('Profile delete error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Profile delete error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // GET ALL USERS
-router.get('/all-users', verifyToken, async (req, res) => {
+router.get("/all-users", verifyToken, async (req, res) => {
   try {
     const users = await User.find({}, "-password -otp -otpExpires");
     res.json({ users });
   } catch (err) {
-    console.error('All users fetch error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("All users fetch error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // Save News (Bookmark)
-router.post('/save/:newsId', verifyToken, async (req, res) => {
+router.post("/save/:newsId", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.savedNews.includes(req.params.newsId)) {
       user.savedNews.push(req.params.newsId);
       await user.save();
     }
 
-    res.json({ message: 'News saved' });
+    res.json({ message: "News saved" });
   } catch (err) {
-    res.status(500).json({ error: 'Server error', details: err.message });
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // DELETE ACCOUNT
-router.delete('/delete-account', auth, async (req, res) => {
+router.delete("/delete-account", auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     await User.findByIdAndDelete(userId);
-    res.json({ message: 'Account deleted successfully' });
+    res.json({ message: "Account deleted successfully" });
   } catch (err) {
-    console.error('Delete account error:', err);
-    res.status(500).json({ error: 'Failed to delete account', details: err.message });
+    console.error("Delete account error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to delete account", details: err.message });
   }
 });
 
 // LOGOUT
-router.post('/logout', auth, async (req, res) => {
+router.post("/logout", auth, async (req, res) => {
   try {
     const token =
       req.cookies?.token ||
-      (req.headers.authorization?.startsWith('Bearer ')
-        ? req.headers.authorization.split(' ')[1]
+      (req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.split(" ")[1]
         : null);
 
-    if (!token) return res.status(400).json({ error: 'No token provided' });
+    if (!token) return res.status(400).json({ error: "No token provided" });
 
     const user = await User.findById(req.user.userId);
     if (user) {
@@ -559,37 +615,45 @@ router.post('/logout', auth, async (req, res) => {
     }
 
     // ✅ Clear cookie (optional if using Bearer tokens only)
-    res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+    res.clearCookie("token", { ...COOKIE_OPTIONS, maxAge: 0 });
 
-    res.json({ message: 'Logout successful.' });
+    res.json({ message: "Logout successful." });
   } catch (err) {
-    console.error('Logout error:', err);
-    res.status(500).json({ error: 'Logout failed', details: err.message });
+    console.error("Logout error:", err);
+    res.status(500).json({ error: "Logout failed", details: err.message });
   }
 });
 
 // LOGIN WITH PHONE NUMBER
-router.post('/login-phone', async (req, res) => {
+router.post("/login-phone", async (req, res) => {
   try {
     const { mobileNumber, password } = req.body;
 
     if (!mobileNumber || !password) {
-      return res.status(400).json({ error: 'Mobile number and password are required' });
+      return res
+        .status(400)
+        .json({ error: "Mobile number and password are required" });
     }
 
     const user = await User.findOne({ mobileNumber });
-    if (!user) return res.status(401).json({ error: 'Invalid mobile number or password' });
+    if (!user)
+      return res
+        .status(401)
+        .json({ error: "Invalid mobile number or password" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid mobile number or password' });
+    if (!isMatch)
+      return res
+        .status(401)
+        .json({ error: "Invalid mobile number or password" });
 
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret'
+      process.env.JWT_SECRET || "your_jwt_secret"
     );
 
     // ✅ Set cookie (response body unchanged)
-    res.cookie('token', token, COOKIE_OPTIONS);
+    res.cookie("token", token, COOKIE_OPTIONS);
 
     res.json({
       message: "Login successful.",
@@ -598,22 +662,22 @@ router.post('/login-phone', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.email,
-        mobileNumber: user.mobileNumber
-      }
+        mobileNumber: user.mobileNumber,
+      },
     });
   } catch (err) {
-    console.error('Login (phone) error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("Login (phone) error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // ===============================================
 // 🧠 GET ACTIVE SESSIONS (Devices)
 // ===============================================
-router.get('/sessions', verifyToken, async (req, res) => {
+router.get("/sessions", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     // ✅ Return only minimal safe info (hide tokens)
     const sessions = (user.activeSessions || []).map((session, index) => ({
@@ -621,43 +685,9 @@ router.get('/sessions', verifyToken, async (req, res) => {
       device: session.device || "Unknown Device",
       token: session.token,
       createdAt: session.createdAt,
-      isCurrent: session.token === (req.headers.authorization?.split(' ')[1] || req.cookies?.token),
-    }));
-
-    res.json({
-      message: 'Active sessions fetched successfully',
-      sessions,
-    });
-  } catch (err) {
-    console.error('Get sessions error:', err);
-    res.status(500).json({ error: 'Failed to fetch sessions', details: err.message });
-  }
-});
-
-// ===============================================
-// 🟡 CHECK ACTIVE SESSIONS WITHOUT TOKEN (for blocked 3rd device login)
-// ===============================================
-router.post("/sessions/check", async (req, res) => {
-  try {
-    const { identifier, password } = req.body;
-
-    if (!identifier || !password) {
-      return res.status(400).json({ error: "Identifier and password are required" });
-    }
-
-    // ✅ Find user by identifier (email or phone)
-    const user = await User.findOne({ identifier });
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    // ✅ Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
-
-    // ✅ Return current sessions safely
-    const sessions = (user.activeSessions || []).map((session, index) => ({
-      id: index + 1,
-      device: session.device || "Unknown Device",
-      createdAt: session.createdAt,
+      isCurrent:
+        session.token ===
+        (req.headers.authorization?.split(" ")[1] || req.cookies?.token),
     }));
 
     res.json({
@@ -665,23 +695,81 @@ router.post("/sessions/check", async (req, res) => {
       sessions,
     });
   } catch (err) {
+    console.error("Get sessions error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch sessions", details: err.message });
+  }
+});
+
+// ===================================================
+// 🔍 CHECK ACTIVE SESSIONS BEFORE LOGIN (PUBLIC ROUTE)
+// ===================================================
+router.post("/sessions/check", async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) {
+      return res
+        .status(400)
+        .json({ error: "Identifier (email/phone) is required" });
+    }
+
+    // Find the user
+    const user = await User.findOne({ identifier });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Clean expired sessions
+    user.activeSessions = (user.activeSessions || []).filter((session) => {
+      try {
+        jwt.verify(session.token, process.env.JWT_SECRET);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    await user.save();
+
+    const sessionCount = user.activeSessions.length;
+
+    if (sessionCount >= 2) {
+      return res.status(200).json({
+        allowed: false,
+        message: "User is already logged in on 2 devices.",
+        sessions: user.activeSessions.map((s) => ({
+          device: s.device,
+          createdAt: s.createdAt,
+        })),
+      });
+    }
+
+    res.status(200).json({
+      allowed: true,
+      message: "User can log in.",
+      sessions: user.activeSessions.map((s) => ({
+        device: s.device,
+        createdAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
     console.error("Session check error:", err);
-    res.status(500).json({ error: "Failed to check sessions", details: err.message });
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
 // ===============================================
 // 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
 // ===============================================
-router.post('/sessions/logout', verifyToken, async (req, res) => {
+router.post("/sessions/logout", verifyToken, async (req, res) => {
   try {
     const { tokenToRemove } = req.body;
     if (!tokenToRemove) {
-      return res.status(400).json({ error: 'tokenToRemove is required' });
+      return res.status(400).json({ error: "tokenToRemove is required" });
     }
 
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const before = user.activeSessions?.length || 0;
     user.activeSessions = user.activeSessions?.filter(
@@ -693,14 +781,18 @@ router.post('/sessions/logout', verifyToken, async (req, res) => {
     const removed = before - after;
 
     res.json({
-      message: removed > 0 ? 'Device logged out successfully' : 'No matching session found',
+      message:
+        removed > 0
+          ? "Device logged out successfully"
+          : "No matching session found",
       remainingSessions: user.activeSessions.length,
     });
   } catch (err) {
-    console.error('Logout device error:', err);
-    res.status(500).json({ error: 'Failed to logout device', details: err.message });
+    console.error("Logout device error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to logout device", details: err.message });
   }
 });
-
 
 module.exports = router;
