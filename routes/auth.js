@@ -671,92 +671,58 @@ router.post("/login-phone", async (req, res) => {
   }
 });
 
-// ===============================================
-// 🧠 GET ACTIVE SESSIONS (Devices)
-// ===============================================
-router.get("/sessions", verifyToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
 
-    // ✅ Return only minimal safe info (hide tokens)
-    const sessions = (user.activeSessions || []).map((session, index) => ({
-      id: index + 1,
-      device: session.device || "Unknown Device",
-      token: session.token,
+// ===============================================
+// 🧠 GET ACTIVE SESSIONS (Supports both authenticated and identifier-based check)
+// ===============================================
+router.post('/sessions', async (req, res) => {
+  try {
+    let user;
+
+    // ✅ 1. Case 1 — Authenticated user (with token)
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      user = await User.findById(decoded.userId);
+    }
+
+    // ✅ 2. Case 2 — Unauthenticated (using identifier & password)
+    if (!user && req.body.identifier && req.body.password) {
+      const { identifier, password } = req.body;
+      const foundUser = await User.findOne({ identifier });
+      if (!foundUser) return res.status(404).json({ error: 'User not found' });
+
+      const isMatch = await bcrypt.compare(password, foundUser.password);
+      if (!isMatch)
+        return res.status(401).json({ error: 'Invalid credentials' });
+
+      user = foundUser;
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized or invalid input' });
+    }
+
+    // ✅ Return minimal session info (no tokens)
+    const sessions = (user.activeSessions || []).map((session, i) => ({
+      id: i + 1,
+      device: session.device || 'Unknown Device',
       createdAt: session.createdAt,
-      isCurrent:
-        session.token ===
-        (req.headers.authorization?.split(" ")[1] || req.cookies?.token),
     }));
 
     res.json({
-      message: "Active sessions fetched successfully",
+      message: 'Active sessions fetched successfully',
       sessions,
     });
   } catch (err) {
-    console.error("Get sessions error:", err);
+    console.error('Get sessions error:', err);
     res
       .status(500)
-      .json({ error: "Failed to fetch sessions", details: err.message });
+      .json({ error: 'Failed to fetch sessions', details: err.message });
   }
 });
 
-// ===================================================
-// 🔍 CHECK ACTIVE SESSIONS BEFORE LOGIN (PUBLIC ROUTE)
-// ===================================================
-router.post("/sessions/check", async (req, res) => {
-  try {
-    const { identifier } = req.body;
-    if (!identifier) {
-      return res
-        .status(400)
-        .json({ error: "Identifier (email/phone) is required" });
-    }
-
-    // Find the user
-    const user = await User.findOne({ identifier });
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Clean expired sessions
-    user.activeSessions = (user.activeSessions || []).filter((session) => {
-      try {
-        jwt.verify(session.token, process.env.JWT_SECRET);
-        return true;
-      } catch {
-        return false;
-      }
-    });
-    await user.save();
-
-    const sessionCount = user.activeSessions.length;
-
-    if (sessionCount >= 2) {
-      return res.status(200).json({
-        allowed: false,
-        message: "User is already logged in on 2 devices.",
-        sessions: user.activeSessions.map((s) => ({
-          device: s.device,
-          createdAt: s.createdAt,
-        })),
-      });
-    }
-
-    res.status(200).json({
-      allowed: true,
-      message: "User can log in.",
-      sessions: user.activeSessions.map((s) => ({
-        device: s.device,
-        createdAt: s.createdAt,
-      })),
-    });
-  } catch (err) {
-    console.error("Session check error:", err);
-    res.status(500).json({ error: "Server error", details: err.message });
-  }
-});
 
 // ===============================================
 // 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
