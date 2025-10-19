@@ -37,11 +37,10 @@ const auth = (req, res, next) => {
 //LOGIN
 router.post('/login', async (req, res) => {
   try {
-    const { identifier, password } = req.body;
+    const { identifier, password, deviceInfo } = req.body;
     const user = await User.findOne({ identifier });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // Check if user is verified
     if (!user.isVerified) {
       return res.status(401).json({ error: 'Account not verified. Please check your OTP.' });
     }
@@ -49,7 +48,33 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+    // ✅ Clean up expired sessions (optional safety)
+    user.activeSessions = (user.activeSessions || []).filter(session => {
+      try {
+        jwt.verify(session.token, JWT_SECRET);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    // ✅ Enforce 2-device limit
+    if (user.activeSessions.length >= 2) {
+      return res.status(403).json({
+        error: 'You are already logged in on 2 devices. Please log out from one before logging in again.',
+      });
+    }
+
+    // ✅ Generate token
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
+
+    // ✅ Save device session
+    user.activeSessions.push({
+      token,
+      device: deviceInfo || req.headers['user-agent'] || "Unknown Device",
+      createdAt: new Date(),
+    });
+    await user.save();
 
     res.json({
       message: "Login successful.",
@@ -58,8 +83,8 @@ router.post('/login', async (req, res) => {
         id: user._id,
         name: user.fullName,
         email: user.identifier,
-        mobileNumber: user.mobileNumber
-      }
+        mobileNumber: user.mobileNumber,
+      },
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -516,14 +541,29 @@ router.delete('/delete-account', auth, async (req, res) => {
 // LOGOUT
 router.post('/logout', auth, async (req, res) => {
   try {
-    // ✅ Clear cookie (response body unchanged)
-    res.clearCookie('token', {
-      ...COOKIE_OPTIONS,
-      maxAge: 0
-    });
+    const token =
+      req.cookies?.token ||
+      (req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.split(' ')[1]
+        : null);
 
-    res.json({ message: 'Logout successful. Please clear your token on client side.' });
+    if (!token) return res.status(400).json({ error: 'No token provided' });
+
+    const user = await User.findById(req.user.userId);
+    if (user) {
+      // ✅ Remove this token’s session
+      user.activeSessions = (user.activeSessions || []).filter(
+        (session) => session.token !== token
+      );
+      await user.save();
+    }
+
+    // ✅ Clear cookie (optional if using Bearer tokens only)
+    res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
+
+    res.json({ message: 'Logout successful.' });
   } catch (err) {
+    console.error('Logout error:', err);
     res.status(500).json({ error: 'Logout failed', details: err.message });
   }
 });
@@ -566,5 +606,64 @@ router.post('/login-phone', async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
+// ===============================================
+// 🧠 GET ACTIVE SESSIONS (Devices)
+// ===============================================
+router.get('/sessions', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // ✅ Return only minimal safe info (hide tokens)
+    const sessions = (user.activeSessions || []).map((session, index) => ({
+      id: index + 1,
+      device: session.device || "Unknown Device",
+      createdAt: session.createdAt,
+      isCurrent: session.token === (req.headers.authorization?.split(' ')[1] || req.cookies?.token),
+    }));
+
+    res.json({
+      message: 'Active sessions fetched successfully',
+      sessions,
+    });
+  } catch (err) {
+    console.error('Get sessions error:', err);
+    res.status(500).json({ error: 'Failed to fetch sessions', details: err.message });
+  }
+});
+
+// ===============================================
+// 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
+// ===============================================
+router.post('/sessions/logout', verifyToken, async (req, res) => {
+  try {
+    const { tokenToRemove } = req.body;
+    if (!tokenToRemove) {
+      return res.status(400).json({ error: 'tokenToRemove is required' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const before = user.activeSessions?.length || 0;
+    user.activeSessions = user.activeSessions?.filter(
+      (session) => session.token !== tokenToRemove
+    );
+    await user.save();
+
+    const after = user.activeSessions?.length || 0;
+    const removed = before - after;
+
+    res.json({
+      message: removed > 0 ? 'Device logged out successfully' : 'No matching session found',
+      remainingSessions: user.activeSessions.length,
+    });
+  } catch (err) {
+    console.error('Logout device error:', err);
+    res.status(500).json({ error: 'Failed to logout device', details: err.message });
+  }
+});
+
 
 module.exports = router;

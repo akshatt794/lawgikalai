@@ -16,6 +16,13 @@ const userSchema = new mongoose.Schema({
   dailyPromptCount: { type: Number, default: 0 },
   lastPromptDate: { type: String, default: "" },
   savedNews: [{ type: mongoose.Schema.Types.ObjectId, ref: "News" }], // <--- Add this line
+  activeSessions: [
+    {
+      token: String,
+      device: String,
+      createdAt: { type: Date, default: Date.now },
+    },
+  ],
 });
 
 module.exports = mongoose.model("User", userSchema);
