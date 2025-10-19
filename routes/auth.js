@@ -619,6 +619,7 @@ router.get('/sessions', verifyToken, async (req, res) => {
     const sessions = (user.activeSessions || []).map((session, index) => ({
       id: index + 1,
       device: session.device || "Unknown Device",
+      token: session.token,
       createdAt: session.createdAt,
       isCurrent: session.token === (req.headers.authorization?.split(' ')[1] || req.cookies?.token),
     }));
