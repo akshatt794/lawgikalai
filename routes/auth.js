@@ -531,13 +531,11 @@ router.put("/profile", verifyToken, async (req, res) => {
       },
     });
   } catch (err) {
-    res
-      .status(500)
-      .json({
-        message: "Failed to update profile",
-        status: false,
-        error: err.message,
-      });
+    res.status(500).json({
+      message: "Failed to update profile",
+      status: false,
+      error: err.message,
+    });
   }
 });
 
@@ -627,7 +625,7 @@ router.post("/logout", auth, async (req, res) => {
 // LOGIN WITH PHONE NUMBER
 router.post("/login-phone", async (req, res) => {
   try {
-    const { mobileNumber, password } = req.body;
+    const { mobileNumber, password, deviceInfo } = req.body;
 
     if (!mobileNumber || !password) {
       return res
@@ -647,10 +645,37 @@ router.post("/login-phone", async (req, res) => {
         .status(401)
         .json({ error: "Invalid mobile number or password" });
 
+    // 🧹 Clean expired sessions (optional safety)
+    user.activeSessions = (user.activeSessions || []).filter((session) => {
+      try {
+        jwt.verify(session.token, JWT_SECRET);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    // 🚫 Enforce max 2 devices per user
+    if (user.activeSessions.length >= 2) {
+      return res.status(403).json({
+        error:
+          "You are already logged in on 2 devices. Please log out from one before logging in again.",
+      });
+    }
+
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET || "your_jwt_secret"
     );
+
+    // 💾 Save session info
+    user.activeSessions.push({
+      token,
+      device: deviceInfo || req.headers["user-agent"] || "Unknown Device",
+      createdAt: new Date(),
+    });
+
+    await user.save();
 
     // ✅ Set cookie (response body unchanged)
     res.cookie("token", token, COOKIE_OPTIONS);
@@ -671,18 +696,17 @@ router.post("/login-phone", async (req, res) => {
   }
 });
 
-
 // ===============================================
 // 🧠 GET ACTIVE SESSIONS (Supports both authenticated and identifier-based check)
 // ===============================================
-router.post('/sessions', async (req, res) => {
+router.post("/sessions", async (req, res) => {
   try {
     let user;
 
     // ✅ 1. Case 1 — Authenticated user (with token)
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
       const decoded = jwt.verify(token, JWT_SECRET);
       user = await User.findById(decoded.userId);
     }
@@ -691,38 +715,37 @@ router.post('/sessions', async (req, res) => {
     if (!user && req.body.identifier && req.body.password) {
       const { identifier, password } = req.body;
       const foundUser = await User.findOne({ identifier });
-      if (!foundUser) return res.status(404).json({ error: 'User not found' });
+      if (!foundUser) return res.status(404).json({ error: "User not found" });
 
       const isMatch = await bcrypt.compare(password, foundUser.password);
       if (!isMatch)
-        return res.status(401).json({ error: 'Invalid credentials' });
+        return res.status(401).json({ error: "Invalid credentials" });
 
       user = foundUser;
     }
 
     if (!user) {
-      return res.status(401).json({ error: 'Unauthorized or invalid input' });
+      return res.status(401).json({ error: "Unauthorized or invalid input" });
     }
 
     // ✅ Return minimal session info (no tokens)
     const sessions = (user.activeSessions || []).map((session, i) => ({
       id: i + 1,
-      device: session.device || 'Unknown Device',
+      device: session.device || "Unknown Device",
       createdAt: session.createdAt,
     }));
 
     res.json({
-      message: 'Active sessions fetched successfully',
+      message: "Active sessions fetched successfully",
       sessions,
     });
   } catch (err) {
-    console.error('Get sessions error:', err);
+    console.error("Get sessions error:", err);
     res
       .status(500)
-      .json({ error: 'Failed to fetch sessions', details: err.message });
+      .json({ error: "Failed to fetch sessions", details: err.message });
   }
 });
-
 
 // ===============================================
 // 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
