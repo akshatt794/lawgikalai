@@ -53,12 +53,17 @@ router.post("/login", async (req, res) => {
     // ✅ Clean up expired sessions (optional safety)
     user.activeSessions = (user.activeSessions || []).filter((session) => {
       try {
-        jwt.verify(session.token, JWT_SECRET);
+        const decoded = jwt.verify(session.token, JWT_SECRET);
+        // if verify succeeds, token is still valid
         return true;
-      } catch {
+      } catch (err) {
+        // remove expired/malformed tokens
+        console.log("🧹 Removing expired token:", err.message);
         return false;
       }
     });
+    // ✅ Save cleanup result
+    await user.save();
 
     // ✅ Enforce 2-device limit
     if (user.activeSessions.length >= 2) {
