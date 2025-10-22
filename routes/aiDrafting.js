@@ -72,4 +72,56 @@ router.post("/draft", verifyToken, async (req, res) => {
   }
 });
 
+//for mobile
+// ✅ Mobile-friendly AI draft (non-streaming)
+router.post("/draft/mobile", verifyToken, async (req, res) => {
+  const { prompt } = req.body;
+  const userId = req.user.userId || req.user.id || req.user._id;
+
+  if (!prompt) {
+    return res.status(400).json({ error: "Prompt is required" });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const today = new Date().toDateString();
+    if (user.lastPromptDate !== today) {
+      user.dailyPromptCount = 0;
+      user.lastPromptDate = today;
+    }
+
+    if (user.dailyPromptCount >= 5) {
+      return res
+        .status(429)
+        .json({ error: "Daily AI draft limit reached (5 prompts/day)." });
+    }
+
+    user.dailyPromptCount += 1;
+    await user.save();
+
+    // ✅ Use non-streaming completion
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const result =
+      completion.choices?.[0]?.message?.content || "No response generated.";
+
+    return res.json({
+      success: true,
+      message: result,
+      remaining: 5 - user.dailyPromptCount,
+    });
+  } catch (error) {
+    console.error("Mobile OpenAI Error:", error);
+    res.status(500).json({
+      error: "Failed to generate legal draft",
+      details: error.message,
+    });
+  }
+});
+
 module.exports = router;
