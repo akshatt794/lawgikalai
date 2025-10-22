@@ -699,89 +699,89 @@ router.post("/login-phone", async (req, res) => {
 // ===============================================
 // 🧠 GET ACTIVE SESSIONS (Supports both authenticated and identifier-based check)
 // ===============================================
-router.post("/sessions", async (req, res) => {
-  try {
-    let user;
+// router.post("/sessions", async (req, res) => {
+//   try {
+//     let user;
 
-    // ✅ 1. Case 1 — Authenticated user (with token)
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.split(" ")[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
-      user = await User.findById(decoded.userId);
-    }
+//     // ✅ 1. Case 1 — Authenticated user (with token)
+//     const authHeader = req.headers.authorization;
+//     if (authHeader?.startsWith("Bearer ")) {
+//       const token = authHeader.split(" ")[1];
+//       const decoded = jwt.verify(token, JWT_SECRET);
+//       user = await User.findById(decoded.userId);
+//     }
 
-    // ✅ 2. Case 2 — Unauthenticated (using identifier & password)
-    if (!user && req.body.identifier && req.body.password) {
-      const { identifier, password } = req.body;
-      const foundUser = await User.findOne({ identifier });
-      if (!foundUser) return res.status(404).json({ error: "User not found" });
+//     // ✅ 2. Case 2 — Unauthenticated (using identifier & password)
+//     if (!user && req.body.identifier && req.body.password) {
+//       const { identifier, password } = req.body;
+//       const foundUser = await User.findOne({ identifier });
+//       if (!foundUser) return res.status(404).json({ error: "User not found" });
 
-      const isMatch = await bcrypt.compare(password, foundUser.password);
-      if (!isMatch)
-        return res.status(401).json({ error: "Invalid credentials" });
+//       const isMatch = await bcrypt.compare(password, foundUser.password);
+//       if (!isMatch)
+//         return res.status(401).json({ error: "Invalid credentials" });
 
-      user = foundUser;
-    }
+//       user = foundUser;
+//     }
 
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized or invalid input" });
-    }
+//     if (!user) {
+//       return res.status(401).json({ error: "Unauthorized or invalid input" });
+//     }
 
-    // ✅ Return minimal session info (no tokens)
-    const sessions = (user.activeSessions || []).map((session, i) => ({
-      id: i + 1,
-      device: session.device || "Unknown Device",
-      createdAt: session.createdAt,
-    }));
+//     // ✅ Return minimal session info (no tokens)
+//     const sessions = (user.activeSessions || []).map((session, i) => ({
+//       id: i + 1,
+//       device: session.device || "Unknown Device",
+//       createdAt: session.createdAt,
+//     }));
 
-    res.json({
-      message: "Active sessions fetched successfully",
-      sessions,
-    });
-  } catch (err) {
-    console.error("Get sessions error:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch sessions", details: err.message });
-  }
-});
+//     res.json({
+//       message: "Active sessions fetched successfully",
+//       sessions,
+//     });
+//   } catch (err) {
+//     console.error("Get sessions error:", err);
+//     res
+//       .status(500)
+//       .json({ error: "Failed to fetch sessions", details: err.message });
+//   }
+// });
 
 // ===============================================
 // 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
 // ===============================================
-router.post("/sessions/logout", verifyToken, async (req, res) => {
-  try {
-    const { tokenToRemove } = req.body;
-    if (!tokenToRemove) {
-      return res.status(400).json({ error: "tokenToRemove is required" });
-    }
+// router.post("/sessions/logout", verifyToken, async (req, res) => {
+//   try {
+//     const { tokenToRemove } = req.body;
+//     if (!tokenToRemove) {
+//       return res.status(400).json({ error: "tokenToRemove is required" });
+//     }
 
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+//     const user = await User.findById(req.user.userId);
+//     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const before = user.activeSessions?.length || 0;
-    user.activeSessions = user.activeSessions?.filter(
-      (session) => session.token !== tokenToRemove
-    );
-    await user.save();
+//     const before = user.activeSessions?.length || 0;
+//     user.activeSessions = user.activeSessions?.filter(
+//       (session) => session.token !== tokenToRemove
+//     );
+//     await user.save();
 
-    const after = user.activeSessions?.length || 0;
-    const removed = before - after;
+//     const after = user.activeSessions?.length || 0;
+//     const removed = before - after;
 
-    res.json({
-      message:
-        removed > 0
-          ? "Device logged out successfully"
-          : "No matching session found",
-      remainingSessions: user.activeSessions.length,
-    });
-  } catch (err) {
-    console.error("Logout device error:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to logout device", details: err.message });
-  }
-});
+//     res.json({
+//       message:
+//         removed > 0
+//           ? "Device logged out successfully"
+//           : "No matching session found",
+//       remainingSessions: user.activeSessions.length,
+//     });
+//   } catch (err) {
+//     console.error("Logout device error:", err);
+//     res
+//       .status(500)
+//       .json({ error: "Failed to logout device", details: err.message });
+//   }
+// });
 
 module.exports = router;
