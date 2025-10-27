@@ -1,19 +1,14 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const newsSchema = new mongoose.Schema({
-  title: String,
-  category: String,
-  date: String,
-  source: String,
-  summary: String,
-  fullUpdate: String,
-  sc_said: String,
-  announced_by: String,
-  applies_to: String,
-  legal_impact: String,
-  legal_sections: [String],
-  image_url: String,
-  file_name: String
-}, { timestamps: true }); // ✅ Adds createdAt & updatedAt automatically
+const newsSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    content: { type: String, required: true },
+    category: { type: String, default: "" },
+    source: { type: String, default: "" },
+    image_url: { type: String, default: null }, // actual S3 path (not presigned)
+  },
+  { timestamps: true } // adds createdAt, updatedAt
+);
 
-module.exports = mongoose.model('News', newsSchema);
+module.exports = mongoose.model("News", newsSchema);
