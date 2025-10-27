@@ -68,20 +68,42 @@ router.get("/", async (req, res) => {
 // ----------------------
 // 3️⃣ Get Single News Details
 // ----------------------
-router.get("/:id", async (req, res) => {
+// ----------------------
+// 3️⃣ Get Single News Details (via body)
+// ----------------------
+router.post("/details", async (req, res) => {
   try {
-    const { id } = req.params;
-    const news = await News.findById(id).lean();
+    const { newsId } = req.body;
 
-    if (!news) return res.status(404).json({ error: "News not found" });
+    if (!newsId) {
+      return res.status(400).json({ ok: false, error: "newsId is required" });
+    }
 
+    const news = await News.findById(newsId).lean();
+    if (!news) {
+      return res.status(404).json({ ok: false, error: "News not found" });
+    }
+
+    // Get presigned image URL if exists
     let image = null;
-    if (news.image_url) image = await getPresignedUrl(news.image_url);
+    if (news.image_url) {
+      image = await getPresignedUrl(news.image_url);
+    }
 
-    res.json({ ok: true, news: { ...news, image } });
+    return res.json({
+      ok: true,
+      news: {
+        ...news,
+        image,
+      },
+    });
   } catch (err) {
     console.error("❌ Fetch Single News Error:", err);
-    res.status(500).json({ ok: false, error: "Server error" });
+    return res.status(500).json({
+      ok: false,
+      error: "Server error",
+      details: err.message,
+    });
   }
 });
 
