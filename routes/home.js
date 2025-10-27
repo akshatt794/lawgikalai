@@ -259,17 +259,22 @@ router.get("/", verifyToken, async (req, res) => {
     // Normalize news and pick only required fields
     const news = await Promise.all(
       (rawNews || []).map(async (n) => {
-        let rawImage = null;
-        // Handle all possible field types
+        // Detect image URL (supporting object structure)
+        let rawImg = null;
         if (n.image) {
-          if (typeof n.image === "string") rawImage = n.image;
-          else if (n.image.url) rawImage = n.image.url;
-          else if (n.image.secure_url) rawImage = n.image.secure_url;
+          rawImg =
+            typeof n.image === "string"
+              ? n.image
+              : n.image.url || n.image.secure_url || null;
+        } else if (n.image_url) {
+          rawImg = n.image_url;
         } else if (n.imageUrl) {
-          rawImage = n.imageUrl;
+          rawImg = n.imageUrl;
         }
-        // Use helper to get a valid URL (pre-signed if required)
-        const image = await toAwsCompatibleUrl(rawImage);
+
+        // Always generate presigned URL if FORCE_SIGNED=true
+        const image = await toAwsCompatibleUrl(rawImg);
+
         return {
           _id: n._id,
           title: n.title,
