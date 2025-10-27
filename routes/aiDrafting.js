@@ -124,4 +124,35 @@ router.post("/draft/mobile", verifyToken, async (req, res) => {
   }
 });
 
+// ✅ GET /api/ai/usage - returns remaining prompts for today
+router.get("/usage", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id || req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const today = new Date().toDateString();
+    if (user.lastPromptDate !== today) {
+      // Reset if new day
+      user.dailyPromptCount = 0;
+      user.lastPromptDate = today;
+      await user.save();
+    }
+
+    const remaining = Math.max(5 - user.dailyPromptCount, 0);
+
+    return res.json({
+      success: true,
+      remaining,
+      used: user.dailyPromptCount,
+      date: today,
+    });
+  } catch (err) {
+    console.error("❌ Usage Check Error:", err);
+    res.status(500).json({ error: "Failed to fetch usage info" });
+  }
+});
+
+
 module.exports = router;
