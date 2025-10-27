@@ -103,13 +103,31 @@ router.get("/", async (req, res) => {
     const { zone } = req.query;
     const filter = zone ? { zone: zone.toUpperCase() } : {};
 
-    // Helper function to generate presigned URL
+    // Helper: generate presigned URL
     async function generatePresignedUrl(key) {
       const command = new GetObjectCommand({
         Bucket: process.env.S3_BUCKET_NAME,
         Key: key,
       });
-      return await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
+      return await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hr
+    }
+    // Helper: extract S3 key safely from URL
+    function extractS3Key(fileUrl) {
+      if (!fileUrl) return null;
+      try {
+        const url = new URL(fileUrl);
+        const parts = url.pathname.split("/").filter(Boolean);
+
+        // Case 1: virtual-hosted → no bucket in path
+        if (!parts[0].includes(process.env.S3_BUCKET_NAME)) {
+          return parts.join("/");
+        }
+
+        // Case 2: path-style → remove bucket from path
+        return parts.slice(1).join("/");
+      } catch {
+        return null;
+      }
     }
 
     if (zone) {
@@ -124,13 +142,10 @@ router.get("/", async (req, res) => {
           .json({ error: "No bail roster found for this zone" });
       }
 
-      // Extract the S3 key from file_url
-      const key = latestRoster.file_url.split(
-        `${process.env.S3_BUCKET_NAME}/`
-      )[1];
+      const key = extractS3Key(latestRoster.file_url);
+      if (!key) throw new Error("Invalid file URL");
 
       const presignedUrl = await generatePresignedUrl(key);
-
       latestRoster.presigned_url = presignedUrl;
 
       return res.json({
@@ -155,7 +170,8 @@ router.get("/", async (req, res) => {
     // Attach presigned URLs for each roster
     const dataWithUrls = await Promise.all(
       latestRosters.map(async (r) => {
-        const key = r.file_url.split(`${process.env.S3_BUCKET_NAME}/`)[1];
+        const key = extractS3Key(r.file_url);
+        if (!key) return r;
         const presignedUrl = await generatePresignedUrl(key);
         return { ...r, presigned_url: presignedUrl };
       })
