@@ -442,6 +442,7 @@ router.get("/adv-search", async (req, res) => {
             Bucket: process.env.S3_BUCKET_NAME,
             Key: src.s3_key,
             ResponseContentDisposition: "inline",
+            ResponseContentType: "application/pdf"
           });
           file_url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
         }

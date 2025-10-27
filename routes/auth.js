@@ -253,6 +253,7 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
+// confirm password
 router.post("/confirm-password", verifyToken, async (req, res) => {
   try {
     const { newPassword, token } = req.body;
@@ -598,31 +599,42 @@ router.delete("/delete-account", auth, async (req, res) => {
 });
 
 // LOGOUT
-router.post("/logout", auth, async (req, res) => {
+// ✅ LOGOUT ROUTE (Secure and Session-Aware)
+router.post("/logout", verifyToken, async (req, res) => {
   try {
-    const token =
-      req.cookies?.token ||
-      (req.headers.authorization?.startsWith("Bearer ")
-        ? req.headers.authorization.split(" ")[1]
-        : null);
-
-    if (!token) return res.status(400).json({ error: "No token provided" });
-
+    const token = req.token; // from verifyToken
     const user = await User.findById(req.user.userId);
-    if (user) {
-      // ✅ Remove this token’s session
-      user.activeSessions = (user.activeSessions || []).filter(
-        (session) => session.token !== token
-      );
-      await user.save();
-    }
 
-    // ✅ Clear cookie (optional if using Bearer tokens only)
-    res.clearCookie("token", { ...COOKIE_OPTIONS, maxAge: 0 });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ message: "Logout successful." });
+    const before = user.activeSessions?.length || 0;
+
+    // 🧹 Remove only this token from active sessions
+    user.activeSessions = user.activeSessions.filter(
+      (session) => session.token !== token
+    );
+
+    await user.save();
+
+    const after = user.activeSessions?.length || 0;
+
+    // 🧹 Clear cookie (if present)
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: "none",
+      secure: false,
+      path: "/",
+    });
+
+    res.json({
+      message:
+        before !== after
+          ? "Logout successful."
+          : "No active session found (possibly already logged out).",
+      remaining_sessions: after,
+    });
   } catch (err) {
-    console.error("Logout error:", err);
+    console.error("Logout error:", err.message);
     res.status(500).json({ error: "Logout failed", details: err.message });
   }
 });
