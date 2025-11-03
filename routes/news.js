@@ -2,9 +2,20 @@ const express = require("express");
 const multer = require("multer");
 const News = require("../models/News");
 const { uploadToS3, getPresignedUrl } = require("../utils/s3Client");
+const { s3 } = require("../utils/s3Client");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() }); // store in memory buffer
+
+const deleteFromS3 = async (key) => {
+  if (!key) return;
+  await s3
+    .deleteObject({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+    })
+    .promise();
+};
 
 // ----------------------
 // 1️⃣ Upload News
@@ -104,6 +115,43 @@ router.post("/details", async (req, res) => {
       error: "Server error",
       details: err.message,
     });
+  }
+});
+
+// ----------------------
+// 4️⃣ Delete News
+// ----------------------
+router.delete("/:newsId", async (req, res) => {
+  try {
+    const { newsId } = req.params;
+
+    if (!newsId)
+      return res.status(400).json({ ok: false, error: "newsId is required" });
+
+    const news = await News.findById(newsId);
+    if (!news) {
+      return res.status(404).json({ ok: false, error: "News not found" });
+    }
+
+    // 🧹 Delete image from S3 (if exists)
+    if (news.image_url) {
+      try {
+        await deleteFromS3(news.image_url);
+        console.log(`🗑️ Deleted image from S3: ${news.image_url}`);
+      } catch (err) {
+        console.warn("⚠️ Failed to delete S3 image:", err.message);
+      }
+    }
+
+    // 🧾 Delete from MongoDB
+    await News.findByIdAndDelete(newsId);
+
+    res.json({ ok: true, message: "News deleted successfully" });
+  } catch (err) {
+    console.error("❌ Delete News Error:", err);
+    res
+      .status(500)
+      .json({ ok: false, error: "Server error", details: err.message });
   }
 });
 
