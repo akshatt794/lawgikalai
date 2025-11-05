@@ -56,7 +56,7 @@ const courtData = {
   districtcourt: [
     {
       name: "District Court Services Portal",
-      link: "https://districts.ecourts.gov.in/",
+      link: "https://delhidistrictcourts.nic.in/",
     },
   ],
   policeadministration: [
