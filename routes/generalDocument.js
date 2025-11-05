@@ -227,26 +227,35 @@ router.delete("/:id", async (req, res) => {
 });
 
 /* ==========================================================
-   ✅ NEW: GET /api/generaldocument/all
-   Fetch **all general documents** (across all categories, paginated)
+   ✅ UPDATED: GET /api/general-document/all
+   Paginated + Filter by ?type
    ========================================================== */
 router.get("/all", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const type = req.query.type;
     const skip = (page - 1) * limit;
 
-    // Fetch paginated documents
-    const total = await GeneralDocument.countDocuments();
-    const docs = await GeneralDocument.find()
+    // 🧠 Map type number to category name
+    const typeMap = {
+      0: "CriminalLaw",
+      1: "BareAct",
+      2: "Event",
+      3: "Forms",
+    };
+    const category = typeMap[type] || "CriminalLaw";
+
+    const filter = { category };
+    const total = await GeneralDocument.countDocuments(filter);
+    const docs = await GeneralDocument.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit)
-      .lean();
+      .limit(limit);
 
     if (!docs.length) {
       return res.json({
-        message: "No general documents found.",
+        message: `No documents found for category ${category}`,
         count: 0,
         currentPage: page,
         totalPages: 0,
@@ -254,47 +263,26 @@ router.get("/all", async (req, res) => {
       });
     }
 
-    // Helper to generate presigned URLs
-    async function generatePresignedUrl(key) {
-      const command = new GetObjectCommand({
-        Bucket: process.env.S3_BUCKET_NAME,
-        Key: key,
-      });
-      return await getSignedUrl(s3, command, { expiresIn: 3600 });
-    }
-
-    function extractS3Key(fileUrl) {
-      try {
-        const url = new URL(fileUrl);
-        const parts = url.pathname.split("/").filter(Boolean);
-        if (!parts[0].includes(process.env.S3_BUCKET_NAME))
-          return parts.join("/");
-        return parts.slice(1).join("/");
-      } catch {
-        return null;
-      }
-    }
-
-    // Generate presigned URLs
-    const dataWithUrls = await Promise.all(
-      docs.map(async (d) => {
-        const key = extractS3Key(d.file_url);
-        const presignedUrl = key ? await generatePresignedUrl(key) : null;
-        return { ...d, presigned_url: presignedUrl };
-      })
-    );
+    // Optionally attach presigned URLs if you have S3 links
+    const data = docs.map((d) => ({
+      id: d._id,
+      title: d.title,
+      category: d.category,
+      file_url: d.file_url,
+      uploaded_on: d.createdAt,
+    }));
 
     res.json({
-      message: "✅ All general documents fetched successfully.",
+      message: `✅ Documents fetched successfully for ${category}`,
       count: total,
       currentPage: page,
       totalPages: Math.ceil(total / limit),
-      data: dataWithUrls,
+      data,
     });
   } catch (err) {
-    console.error("❌ Error fetching all general documents:", err);
+    console.error("❌ Error fetching general documents:", err);
     res.status(500).json({
-      error: "Failed to fetch general documents",
+      error: "Failed to fetch general documents.",
       details: err.message,
     });
   }
