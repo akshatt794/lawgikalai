@@ -191,4 +191,141 @@ router.get("/", async (req, res) => {
   }
 });
 
+/* ==========================================================
+   ✅ UPDATED: GET /api/bailroster/all (Paginated)
+   ========================================================== */
+router.get("/all", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const total = await BailRoster.countDocuments();
+    const rosters = await BailRoster.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    if (!rosters.length) {
+      return res.json({
+        message: "No bail rosters found.",
+        count: 0,
+        currentPage: page,
+        totalPages: 0,
+        data: [],
+      });
+    }
+
+    async function generatePresignedUrl(key) {
+      const command = new GetObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+      });
+      return await getSignedUrl(s3, command, { expiresIn: 3600 });
+    }
+
+    function extractS3Key(fileUrl) {
+      try {
+        const url = new URL(fileUrl);
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (!parts[0].includes(process.env.S3_BUCKET_NAME))
+          return parts.join("/");
+        return parts.slice(1).join("/");
+      } catch {
+        return null;
+      }
+    }
+
+    const dataWithUrls = await Promise.all(
+      rosters.map(async (r) => {
+        const key = extractS3Key(r.file_url);
+        const presignedUrl = key ? await generatePresignedUrl(key) : null;
+        return { ...r, presigned_url: presignedUrl };
+      })
+    );
+
+    res.json({
+      message: "✅ All bail rosters fetched successfully.",
+      count: total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      data: dataWithUrls,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching all bail rosters:", err);
+    res.status(500).json({
+      error: "Failed to fetch all bail rosters",
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/bailroster/:id
+ * @desc Delete a bail roster by ID (and remove file from S3)
+ */
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "Roster ID is required." });
+    }
+
+    // Find roster
+    const roster = await BailRoster.findById(id);
+    if (!roster) {
+      return res.status(404).json({ error: "Bail roster not found." });
+    }
+
+    // 🪣 Extract S3 key
+    const extractS3Key = (fileUrl) => {
+      if (!fileUrl) return null;
+      try {
+        const url = new URL(fileUrl);
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (!parts[0].includes(process.env.S3_BUCKET_NAME)) {
+          return parts.join("/");
+        }
+        return parts.slice(1).join("/");
+      } catch {
+        return null;
+      }
+    };
+
+    const fileKey = extractS3Key(roster.file_url);
+
+    // 🧹 Delete file from S3 if key exists
+    if (fileKey) {
+      try {
+        const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: fileKey,
+          })
+        );
+        console.log(`🗑️ Deleted file from S3: ${fileKey}`);
+      } catch (s3Err) {
+        console.warn("⚠️ Failed to delete file from S3:", s3Err.message);
+      }
+    }
+
+    // 🗑️ Delete document from MongoDB
+    await BailRoster.findByIdAndDelete(id);
+
+    res.json({
+      message: "✅ Bail roster deleted successfully.",
+      deletedId: id,
+    });
+  } catch (err) {
+    console.error("❌ Error deleting bail roster:", err);
+    res.status(500).json({
+      error: "Failed to delete bail roster",
+      details: err.message,
+    });
+  }
+});
+
 module.exports = router;

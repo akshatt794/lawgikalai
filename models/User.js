@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
   practiceArea: [String], // Array of practice areas
   identifier: String, // for login (optional: you can remove if you use email only)
   password: String,
+  fcmToken: { type: String, default: "" },
   otp: String,
   otpExpires: Date,
   isVerified: { type: Boolean, default: false },

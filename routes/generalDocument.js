@@ -176,4 +176,128 @@ router.get("/", async (req, res) => {
   }
 });
 
+/**
+ * @route DELETE /api/generaldocument/:id
+ * @desc Delete a document (any category)
+ */
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 🔹 Find the document
+    const doc = await GeneralDocument.findById(id);
+    if (!doc) {
+      return res
+        .status(404)
+        .json({ status: false, message: "Document not found" });
+    }
+
+    // 🔹 Extract S3 key
+    const key = extractS3Key(doc.file_url);
+    if (!key) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid file URL" });
+    }
+
+    // 🔹 Delete from S3
+    const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    // 🔹 Delete from MongoDB
+    await GeneralDocument.findByIdAndDelete(id);
+
+    res.status(200).json({
+      status: true,
+      message: `🗑️ Document '${doc.title}' deleted successfully`,
+    });
+  } catch (err) {
+    console.error("❌ Delete Document Error:", err);
+    res.status(500).json({
+      status: false,
+      message: "Failed to delete document",
+      error: err.message,
+    });
+  }
+});
+
+/* ==========================================================
+   ✅ NEW: GET /api/generaldocument/all
+   Fetch **all general documents** (across all categories, paginated)
+   ========================================================== */
+router.get("/all", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch paginated documents
+    const total = await GeneralDocument.countDocuments();
+    const docs = await GeneralDocument.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    if (!docs.length) {
+      return res.json({
+        message: "No general documents found.",
+        count: 0,
+        currentPage: page,
+        totalPages: 0,
+        data: [],
+      });
+    }
+
+    // Helper to generate presigned URLs
+    async function generatePresignedUrl(key) {
+      const command = new GetObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+      });
+      return await getSignedUrl(s3, command, { expiresIn: 3600 });
+    }
+
+    function extractS3Key(fileUrl) {
+      try {
+        const url = new URL(fileUrl);
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (!parts[0].includes(process.env.S3_BUCKET_NAME))
+          return parts.join("/");
+        return parts.slice(1).join("/");
+      } catch {
+        return null;
+      }
+    }
+
+    // Generate presigned URLs
+    const dataWithUrls = await Promise.all(
+      docs.map(async (d) => {
+        const key = extractS3Key(d.file_url);
+        const presignedUrl = key ? await generatePresignedUrl(key) : null;
+        return { ...d, presigned_url: presignedUrl };
+      })
+    );
+
+    res.json({
+      message: "✅ All general documents fetched successfully.",
+      count: total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      data: dataWithUrls,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching all general documents:", err);
+    res.status(500).json({
+      error: "Failed to fetch general documents",
+      details: err.message,
+    });
+  }
+});
+
 module.exports = router;
