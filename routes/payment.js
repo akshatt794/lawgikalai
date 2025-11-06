@@ -88,35 +88,62 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
 // ✅ VERIFY PAYMENT (SDK-BASED with getOrderStatus)
 router.post("/verify", async (req, res) => {
   try {
-    const { txnId } = req.query; // frontend sends ?txnId=<id>
+    const { txnId } = req.query;
     if (!txnId)
       return res.status(400).json({ error: "Transaction ID required" });
 
     const txn = await Transaction.findById(txnId);
     if (!txn) return res.status(404).json({ error: "Transaction not found" });
 
-    // 🔍 Fetch order status from PhonePe
     const response = await phonePeClient.getOrderStatus(txn._id.toString());
-
-    const state = response?.state; // can be "PENDING", "FAILED", or "COMPLETED"
+    const state = response?.state;
 
     if (state === "COMPLETED") {
       txn.status = "success";
       await txn.save();
 
       const user = await User.findById(txn.userId);
-      const start = new Date(); // payment time
-      const end = new Date(start.getTime()); // clone start
-      if (txn.planName.includes("1 Month")) end.setMonth(end.getMonth() + 1);
-      else if (txn.planName.includes("3 Month"))
-        end.setMonth(end.getMonth() + 3);
-      else if (txn.planName.includes("6 Month"))
-        end.setMonth(end.getMonth() + 6);
-      else if (txn.planName.includes("12 Month"))
-        end.setFullYear(end.getFullYear() + 1);
+      const start = new Date(); // ✅ unique payment timestamp
+      const end = new Date(start.getTime()); // ✅ clone exact time
 
-      user.plan = { name: txn.planName, startDate: start, endDate: end };
+      const planName = txn.planName.toLowerCase();
+      if (planName.includes("1 month") || planName.includes("1 Month")) {
+        end.setMonth(end.getMonth() + 1);
+      } else if (
+        planName.includes("3 months") ||
+        planName.includes("3 Months")
+      ) {
+        end.setMonth(end.getMonth() + 3);
+      } else if (
+        planName.includes("6 months") ||
+        planName.includes("6 Months")
+      ) {
+        end.setMonth(end.getMonth() + 6);
+      } else if (
+        planName.includes("12 months") ||
+        planName.includes("1 year") || planName.includes("12 Months")
+      ) {
+        end.setFullYear(end.getFullYear() + 1);
+      } else {
+        console.warn("⚠️ Unknown plan duration:", planName);
+        end.setMonth(end.getMonth() + 1); // fallback to 1 month
+      }
+
+      console.log("🕒 Start Date:", start);
+      console.log("🕓 End Date:", end);
+      console.log("🧾 Plan:", txn.planName);
+
+      user.plan = {
+        name: txn.planName,
+        startDate: start,
+        endDate: end,
+      };
+
       await user.save();
+
+      // Confirm database update
+      const updated = await User.findById(txn.userId).lean();
+      console.log("✅ Updated user plan in DB:", updated.plan);
 
       return res.json({
         success: true,
