@@ -18,7 +18,6 @@ const PHONEPE_CLIENT_SECRET = process.env.PHONEPE_CLIENT_SECRET;
 const PHONEPE_CLIENT_VERSION = process.env.PHONEPE_CLIENT_VERSION || "1.0.0";
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
-
 // ✅ Initialize PhonePe Client
 const phonePeClient = StandardCheckoutClient.getInstance(
   PHONEPE_CLIENT_ID,
@@ -129,7 +128,7 @@ router.post("/verify", async (req, res) => {
 });
 
 // ✅ FETCH TRANSACTION HISTORY
-router.get("/history", verifyToken, async (req, res) => {
+router.get("/history", lightVerifyToken, async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.user.userId })
       .sort({ createdAt: -1 })
