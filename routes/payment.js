@@ -88,17 +88,31 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
 // ✅ VERIFY PAYMENT (SDK-BASED)
 router.post("/verify", async (req, res) => {
   try {
-    const { txnId } = req.query; // frontend sends ?txnId=<id>
+    const { txnId } = req.query;
     if (!txnId)
       return res.status(400).json({ error: "Transaction ID required" });
 
     const txn = await Transaction.findById(txnId);
     if (!txn) return res.status(404).json({ error: "Transaction not found" });
 
-    // 🔍 Verify with SDK call (recommended)
-    const statusResponse = await phonePeClient.status(txn._id.toString());
+    console.log("🔍 Verifying transaction:", txn._id.toString());
 
-    const status = statusResponse?.code || statusResponse?.data?.code;
+    // ✅ Use explicit merchantOrderId & Merchant ID
+    const statusResponse = await phonePeClient.status(
+      process.env.PHONEPE_CLIENT_ID,
+      txn._id.toString()
+    );
+
+    console.log("📦 Raw statusResponse:", JSON.stringify(statusResponse, null, 2));
+
+    // ✅ Handle different response formats (sandbox vs prod)
+    const status =
+      statusResponse?.code ||
+      statusResponse?.data?.code ||
+      statusResponse?.data?.response?.code ||
+      statusResponse?.message;
+
+    console.log("✅ Parsed payment status:", status);
 
     if (status === "PAYMENT_SUCCESS") {
       txn.status = "success";
@@ -120,7 +134,10 @@ router.post("/verify", async (req, res) => {
         success: true,
         message: "Payment successful and plan activated.",
       });
-    } else if (status === "PAYMENT_PENDING") {
+    } else if (
+      status === "PAYMENT_PENDING" ||
+      status === "PAYMENT_INITIATED"
+    ) {
       txn.status = "pending";
       await txn.save();
       return res.json({
@@ -133,13 +150,18 @@ router.post("/verify", async (req, res) => {
       return res.json({
         success: false,
         message: "Payment failed or cancelled.",
+        status,
       });
     }
   } catch (err) {
-    console.error("Verification error:", err);
-    res.status(500).json({ error: "Payment verification failed" });
+    console.error("❌ Verification error details:", err.message);
+    res.status(500).json({
+      error: "Payment verification failed",
+      details: err.message,
+    });
   }
 });
+
 
 // ✅ FETCH TRANSACTION HISTORY
 router.get("/history", lightVerifyToken, async (req, res) => {
