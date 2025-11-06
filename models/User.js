@@ -24,6 +24,25 @@ const userSchema = new mongoose.Schema({
       createdAt: { type: Date, default: Date.now },
     },
   ],
+  // ✅ NEW FIELD
+  role: {
+    type: String,
+    enum: ["user", "admin"],
+    default: "user",
+  },
+  // ✅ Subscription fields
+  plan: {
+    name: { type: String, default: null }, // e.g. "Advocate Starter Plan"
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+  },
+
+  // ✅ Trial
+  trial: {
+    started: { type: Boolean, default: false },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+  },
 });
 
 module.exports = mongoose.model("User", userSchema);
