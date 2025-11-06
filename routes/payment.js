@@ -105,12 +105,14 @@ router.post("/verify", async (req, res) => {
       await txn.save();
 
       const user = await User.findById(txn.userId);
-      const start = new Date();
-      const end = new Date();
+      const start = new Date(); // payment time
+      const end = new Date(start.getTime()); // clone start
       if (txn.planName.includes("1 Month")) end.setMonth(end.getMonth() + 1);
-      if (txn.planName.includes("3 Month")) end.setMonth(end.getMonth() + 3);
-      if (txn.planName.includes("6 Month")) end.setMonth(end.getMonth() + 6);
-      if (txn.planName.includes("12 Month"))
+      else if (txn.planName.includes("3 Month"))
+        end.setMonth(end.getMonth() + 3);
+      else if (txn.planName.includes("6 Month"))
+        end.setMonth(end.getMonth() + 6);
+      else if (txn.planName.includes("12 Month"))
         end.setFullYear(end.getFullYear() + 1);
 
       user.plan = { name: txn.planName, startDate: start, endDate: end };
