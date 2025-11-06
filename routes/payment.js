@@ -8,7 +8,7 @@ const {
 } = require("pg-sdk-node");
 const User = require("../models/User");
 const Transaction = require("../models/transaction");
-const { verifyToken } = require("../middleware/verifyToken");
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ const PHONEPE_CLIENT_ID = process.env.PHONEPE_CLIENT_ID;
 const PHONEPE_CLIENT_SECRET = process.env.PHONEPE_CLIENT_SECRET;
 const PHONEPE_CLIENT_VERSION = process.env.PHONEPE_CLIENT_VERSION || "1.0.0";
 const FRONTEND_URL = process.env.FRONTEND_URL;
-const BACKEND_URL = process.env.BACKEND_URL;
+
 
 // ✅ Initialize PhonePe Client
 const phonePeClient = StandardCheckoutClient.getInstance(
@@ -28,7 +28,7 @@ const phonePeClient = StandardCheckoutClient.getInstance(
 );
 
 // ✅ INITIATE PAYMENT
-router.post("/initiate", verifyToken, async (req, res) => {
+router.post("/initiate", lightVerifyToken, async (req, res) => {
   try {
     const { planName, amount } = req.body;
     const user = await User.findById(req.user.userId);
