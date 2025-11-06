@@ -52,16 +52,17 @@ router.post("/initiate", verifyToken, async (req, res) => {
       .merchantOrderId(transaction._id.toString())
       .amount(amount * 100)
       .redirectUrl(`${FRONTEND_URL}/payment-status?txnId=${transaction._id}`)
-      .callbackUrl(`${BACKEND_URL}/api/payment/verify?txnId=${transaction._id}`)
       .metaInfo(metaInfo)
       .build();
 
     const response = await phonePeClient.pay(payRequest);
     const redirectUrl = response?.redirectUrl;
 
-     if (!redirectUrl) {
+    if (!redirectUrl) {
       console.error("⚠️ Missing redirectUrl from PhonePe response:", response);
-      return res.status(500).json({ error: "Failed to create payment session" });
+      return res
+        .status(500)
+        .json({ error: "Failed to create payment session" });
     }
 
     res.json({ redirectUrl });
