@@ -54,11 +54,22 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
       .metaInfo(metaInfo)
       .build();
 
+    console.log({
+      clientId: PHONEPE_CLIENT_ID,
+      clientSecret: PHONEPE_CLIENT_SECRET ? "***" : "MISSING",
+      amount,
+      planName,
+      redirectUrl: `${FRONTEND_URL}/payment-status?txnId=${transaction._id}`,
+    });
+
     const response = await phonePeClient.pay(payRequest);
     const redirectUrl = response?.redirectUrl;
 
     if (!redirectUrl) {
-      console.error("⚠️ Missing redirectUrl from PhonePe response:", response);
+      console.error(
+        "⚠️ PhonePe API response:",
+        JSON.stringify(response, null, 2)
+      );
       return res
         .status(500)
         .json({ error: "Failed to create payment session" });
@@ -66,7 +77,10 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
 
     res.json({ redirectUrl });
   } catch (err) {
-    console.error("PhonePe Init Error:", err);
+    console.error(
+      "PhonePe Init Error:",
+      err.response?.data || err.message || err
+    );
     res.status(500).json({ error: "Failed to initiate payment" });
   }
 });
