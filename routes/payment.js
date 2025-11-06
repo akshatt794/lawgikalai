@@ -85,7 +85,7 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
   }
 });
 
-// ✅ VERIFY PAYMENT (SDK-BASED)
+// ✅ VERIFY PAYMENT (SDK-BASED with getOrderStatus)
 router.post("/verify", async (req, res) => {
   try {
     const { txnId } = req.query; // frontend sends ?txnId=<id>
@@ -95,12 +95,12 @@ router.post("/verify", async (req, res) => {
     const txn = await Transaction.findById(txnId);
     if (!txn) return res.status(404).json({ error: "Transaction not found" });
 
-    // 🔍 Verify with SDK call (recommended)
-    const statusResponse = await phonePeClient.status(txn._id.toString());
+    // 🔍 Fetch order status from PhonePe
+    const response = await phonePeClient.getOrderStatus(txn._id.toString());
 
-    const status = statusResponse?.code || statusResponse?.data?.code;
+    const state = response?.state; // can be "PENDING", "FAILED", or "COMPLETED"
 
-    if (status === "PAYMENT_SUCCESS") {
+    if (state === "COMPLETED") {
       txn.status = "success";
       await txn.save();
 
@@ -120,7 +120,7 @@ router.post("/verify", async (req, res) => {
         success: true,
         message: "Payment successful and plan activated.",
       });
-    } else if (status === "PAYMENT_PENDING") {
+    } else if (state === "PENDING") {
       txn.status = "pending";
       await txn.save();
       return res.json({
@@ -136,7 +136,7 @@ router.post("/verify", async (req, res) => {
       });
     }
   } catch (err) {
-    console.error("Verification error:", err);
+    console.error("Verification error:", err.response?.data || err.message);
     res.status(500).json({ error: "Payment verification failed" });
   }
 });
