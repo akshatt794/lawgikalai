@@ -456,6 +456,9 @@ router.get("/profile", verifyToken, async (req, res) => {
       qualification: user.qualification,
       experience: user.experience,
       practice_areas,
+      role: user.role,
+      plan: user.plan || null,
+      trial: user.trial || null,
     });
   } catch (err) {
     res.status(500).json({ error: "Server error", details: err.message });
@@ -714,91 +717,75 @@ router.post("/login-phone", async (req, res) => {
 });
 
 // ===============================================
-// 🧠 GET ACTIVE SESSIONS (Supports both authenticated and identifier-based check)
+// 🧩 TOGGLE USER ROLE (Admin ↔ User)
 // ===============================================
-// router.post("/sessions", async (req, res) => {
-//   try {
-//     let user;
+router.put("/toggle-role/:id", verifyToken, async (req, res) => {
+  try {
+    const requester = await User.findById(req.user.userId);
+    if (!requester)
+      return res.status(404).json({ error: "Requester not found" });
 
-//     // ✅ 1. Case 1 — Authenticated user (with token)
-//     const authHeader = req.headers.authorization;
-//     if (authHeader?.startsWith("Bearer ")) {
-//       const token = authHeader.split(" ")[1];
-//       const decoded = jwt.verify(token, JWT_SECRET);
-//       user = await User.findById(decoded.userId);
-//     }
+    // ✅ Only admin can change roles
+    if (requester.role !== "admin") {
+      return res.status(403).json({ error: "Access denied. Admins only." });
+    }
 
-//     // ✅ 2. Case 2 — Unauthenticated (using identifier & password)
-//     if (!user && req.body.identifier && req.body.password) {
-//       const { identifier, password } = req.body;
-//       const foundUser = await User.findOne({ identifier });
-//       if (!foundUser) return res.status(404).json({ error: "User not found" });
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) return res.status(404).json({ error: "User not found" });
 
-//       const isMatch = await bcrypt.compare(password, foundUser.password);
-//       if (!isMatch)
-//         return res.status(401).json({ error: "Invalid credentials" });
+    // ✅ Toggle logic
+    targetUser.role = targetUser.role === "admin" ? "user" : "admin";
+    await targetUser.save();
 
-//       user = foundUser;
-//     }
+    res.json({
+      message: `User role updated successfully to '${targetUser.role}'.`,
+      userId: targetUser._id,
+      newRole: targetUser.role,
+    });
+  } catch (err) {
+    console.error("Toggle role error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to toggle role", details: err.message });
+  }
+});
 
-//     if (!user) {
-//       return res.status(401).json({ error: "Unauthorized or invalid input" });
-//     }
+// ✅ Activate 7-day free trial
+router.post("/start-trial", verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-//     // ✅ Return minimal session info (no tokens)
-//     const sessions = (user.activeSessions || []).map((session, i) => ({
-//       id: i + 1,
-//       device: session.device || "Unknown Device",
-//       createdAt: session.createdAt,
-//     }));
+    if (user.role === "admin") {
+      return res.json({ message: "Admin users do not need a trial or plan." });
+    }
 
-//     res.json({
-//       message: "Active sessions fetched successfully",
-//       sessions,
-//     });
-//   } catch (err) {
-//     console.error("Get sessions error:", err);
-//     res
-//       .status(500)
-//       .json({ error: "Failed to fetch sessions", details: err.message });
-//   }
-// });
+    // check if already on plan or trial
+    if (user.trial.started || user.plan?.name) {
+      return res.status(400).json({ error: "Trial or plan already active." });
+    }
 
-// ===============================================
-// 🔒 LOGOUT FROM SPECIFIC SESSION (DEVICE)
-// ===============================================
-// router.post("/sessions/logout", verifyToken, async (req, res) => {
-//   try {
-//     const { tokenToRemove } = req.body;
-//     if (!tokenToRemove) {
-//       return res.status(400).json({ error: "tokenToRemove is required" });
-//     }
+    const start = new Date();
+    const end = new Date();
+    end.setDate(start.getDate() + 7);
 
-//     const user = await User.findById(req.user.userId);
-//     if (!user) return res.status(404).json({ error: "User not found" });
+    user.trial = {
+      started: true,
+      startDate: start,
+      endDate: end,
+    };
 
-//     const before = user.activeSessions?.length || 0;
-//     user.activeSessions = user.activeSessions?.filter(
-//       (session) => session.token !== tokenToRemove
-//     );
-//     await user.save();
+    await user.save();
 
-//     const after = user.activeSessions?.length || 0;
-//     const removed = before - after;
-
-//     res.json({
-//       message:
-//         removed > 0
-//           ? "Device logged out successfully"
-//           : "No matching session found",
-//       remainingSessions: user.activeSessions.length,
-//     });
-//   } catch (err) {
-//     console.error("Logout device error:", err);
-//     res
-//       .status(500)
-//       .json({ error: "Failed to logout device", details: err.message });
-//   }
-// });
+    res.json({
+      message: "Trial activated successfully!",
+      trial: user.trial,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Failed to start trial", details: err.message });
+  }
+});
 
 module.exports = router;

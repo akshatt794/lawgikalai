@@ -96,6 +96,12 @@ const courtData = {
     },
     { name: "West Bengal Police", link: "https://wbpolice.gov.in/" },
   ],
+  calculator: [
+    {
+      name: "Court Fees Calculator",
+      link: "https://www.sci.gov.in/court-fees-calculator/",
+    },
+  ],
 };
 
 module.exports = courtData;

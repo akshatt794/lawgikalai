@@ -206,4 +206,61 @@ router.get("/all", async (req, res) => {
   }
 });
 
+/* ==========================================================
+   ✏️ PUT /api/judges-list/edit/:id
+   Edit a judge by ID (from any zone)
+   ========================================================== */
+router.put("/edit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      designation_jurisdiction,
+      court_room,
+      vc_link,
+      vc_meeting_id_email,
+      zone,
+    } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: "Judge ID is required." });
+    }
+
+    // Find the existing judge
+    const existingJudge = await Judge.findById(id);
+    if (!existingJudge) {
+      return res.status(404).json({ error: "Judge not found." });
+    }
+
+    // Prepare updated fields (only update provided ones)
+    const updatedFields = {};
+
+    if (name) updatedFields.name = name.trim();
+    if (designation_jurisdiction)
+      updatedFields.designation_jurisdiction = designation_jurisdiction.trim();
+    if (court_room) updatedFields.court_room = court_room.trim();
+    if (vc_link !== undefined) updatedFields.vc_link = vc_link?.trim() || "";
+    if (vc_meeting_id_email !== undefined)
+      updatedFields.vc_meeting_id_email = vc_meeting_id_email?.trim() || "";
+    if (zone) updatedFields.zone = zone.trim().toUpperCase();
+
+    // Update the judge
+    const updatedJudge = await Judge.findByIdAndUpdate(id, updatedFields, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.json({
+      message: "✅ Judge updated successfully.",
+      data: updatedJudge,
+    });
+  } catch (err) {
+    console.error("❌ Error updating judge:", err);
+    res.status(500).json({
+      error: "Failed to update judge.",
+      details: err.message,
+    });
+  }
+});
+
 module.exports = router;
