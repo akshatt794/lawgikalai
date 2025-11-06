@@ -31,6 +31,7 @@
         "openai": "^5.10.1",
         "otp-generator": "^4.0.1",
         "pdf-parse": "^1.1.1",
+        "pg-sdk-node": "^2.0.2",
         "streamifier": "^0.1.1"
     },
     "scripts": {

@@ -1,6 +1,11 @@
 const express = require("express");
-const crypto = require("crypto");
-const axios = require("axios");
+const { randomUUID } = require("crypto");
+const {
+  StandardCheckoutClient,
+  Env,
+  MetaInfo,
+  StandardCheckoutPayRequest,
+} = require("pg-sdk-node");
 const User = require("../models/User");
 const Transaction = require("../models/transaction");
 const { verifyToken } = require("../middleware/verifyToken");
@@ -8,12 +13,21 @@ const { verifyToken } = require("../middleware/verifyToken");
 const router = express.Router();
 
 // ✅ Environment variables
-const PHONEPE_BASE_URL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
-const MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID;
-const SALT_KEY = process.env.PHONEPE_SALT_KEY;
-const SALT_INDEX = process.env.PHONEPE_SALT_INDEX;
-const REDIRECT_URL = process.env.FRONTEND_URL + "/payment-status";
+const PHONEPE_CLIENT_ID = process.env.PHONEPE_CLIENT_ID;
+const PHONEPE_CLIENT_SECRET = process.env.PHONEPE_CLIENT_SECRET;
+const PHONEPE_CLIENT_VERSION = process.env.PHONEPE_CLIENT_VERSION || "1.0.0";
+const FRONTEND_URL = process.env.FRONTEND_URL;
+const BACKEND_URL = process.env.BACKEND_URL;
 
+// ✅ Initialize PhonePe Client
+const phonePeClient = StandardCheckoutClient.getInstance(
+  PHONEPE_CLIENT_ID,
+  PHONEPE_CLIENT_SECRET,
+  PHONEPE_CLIENT_VERSION,
+  process.env.NODE_ENV === "production" ? Env.PRODUCTION : Env.SANDBOX
+);
+
+// ✅ INITIATE PAYMENT
 router.post("/initiate", verifyToken, async (req, res) => {
   try {
     const { planName, amount } = req.body;
@@ -29,59 +43,47 @@ router.post("/initiate", verifyToken, async (req, res) => {
     });
     await transaction.save();
 
-    const data = {
-      merchantId: MERCHANT_ID,
-      merchantTransactionId: transaction._id.toString(),
-      merchantUserId: user._id.toString(),
-      amount: amount * 100, // in paise
-      redirectUrl: `${REDIRECT_URL}?txnId=${transaction._id}`,
-      redirectMode: "POST",
-      callbackUrl: `${process.env.BACKEND_URL}/api/payment/verify`,
-      paymentInstrument: {
-        type: "PAY_PAGE",
-      },
-    };
+    const metaInfo = MetaInfo.builder()
+      .udf1(user._id.toString())
+      .udf2(planName)
+      .build();
 
-    const payload = Buffer.from(JSON.stringify(data)).toString("base64");
-    const checksum = crypto
-      .createHash("sha256")
-      .update(payload + "/pg/v1/pay" + SALT_KEY)
-      .digest("hex");
-    const finalChecksum = checksum + "###" + SALT_INDEX;
+    const payRequest = StandardCheckoutPayRequest.builder()
+      .merchantOrderId(transaction._id.toString())
+      .amount(amount * 100)
+      .redirectUrl(`${FRONTEND_URL}/payment-status?txnId=${transaction._id}`)
+      .metaInfo(metaInfo)
+      .build();
 
-    const response = await axios.post(
-      `${PHONEPE_BASE_URL}/pg/v1/pay`,
-      { request: payload },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-VERIFY": finalChecksum,
-        },
-      }
-    );
-
-    const redirectUrl =
-      response.data?.data?.instrumentResponse?.redirectInfo?.url;
+    const response = await phonePeClient.pay(payRequest);
+    const redirectUrl = response?.redirectUrl;
 
     res.json({ redirectUrl });
   } catch (err) {
-    console.error("PhonePe Init Error:", err.message);
+    console.error("PhonePe Init Error:", err);
     res.status(500).json({ error: "Failed to initiate payment" });
   }
 });
 
-// ✅ Payment verification webhook
+// ✅ VERIFY PAYMENT (SDK-BASED)
 router.post("/verify", async (req, res) => {
   try {
-    const { merchantTransactionId, code } = req.body.data;
-    const txn = await Transaction.findById(merchantTransactionId);
+    const { txnId } = req.query; // frontend sends ?txnId=<id>
+    if (!txnId)
+      return res.status(400).json({ error: "Transaction ID required" });
+
+    const txn = await Transaction.findById(txnId);
     if (!txn) return res.status(404).json({ error: "Transaction not found" });
 
-    if (code === "PAYMENT_SUCCESS") {
+    // 🔍 Verify with SDK call (recommended)
+    const statusResponse = await phonePeClient.status(txn._id.toString());
+
+    const status = statusResponse?.code || statusResponse?.data?.code;
+
+    if (status === "PAYMENT_SUCCESS") {
       txn.status = "success";
       await txn.save();
 
-      // Activate plan for user
       const user = await User.findById(txn.userId);
       const start = new Date();
       const end = new Date();
@@ -91,25 +93,35 @@ router.post("/verify", async (req, res) => {
       if (txn.planName.includes("12 Month"))
         end.setFullYear(end.getFullYear() + 1);
 
-      user.plan = {
-        name: txn.planName,
-        startDate: start,
-        endDate: end,
-      };
+      user.plan = { name: txn.planName, startDate: start, endDate: end };
       await user.save();
+
+      return res.json({
+        success: true,
+        message: "Payment successful and plan activated.",
+      });
+    } else if (status === "PAYMENT_PENDING") {
+      txn.status = "pending";
+      await txn.save();
+      return res.json({
+        success: false,
+        message: "Payment is still pending.",
+      });
     } else {
       txn.status = "failed";
       await txn.save();
+      return res.json({
+        success: false,
+        message: "Payment failed or cancelled.",
+      });
     }
-
-    res.json({ success: true });
   } catch (err) {
     console.error("Verification error:", err);
-    res.status(500).json({ error: "Verification failed" });
+    res.status(500).json({ error: "Payment verification failed" });
   }
 });
 
-// ✅ Fetch all transactions for the logged-in user
+// ✅ FETCH TRANSACTION HISTORY
 router.get("/history", verifyToken, async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.user.userId })
