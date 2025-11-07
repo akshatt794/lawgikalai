@@ -752,7 +752,7 @@ router.put("/toggle-role/:id", verifyToken, async (req, res) => {
 });
 
 // ✅ Activate 7-day free trial
-router.post("/start-trial", verifyToken, async (req, res) => {
+router.post("/start-trial", lightVerifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
