@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const News = require("../models/News");
 const { verifyToken } = require("../middleware/verifyToken");
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -424,7 +425,7 @@ router.post("/resend-otp", async (req, res) => {
 });
 
 // GET PROFILE
-router.get("/profile", verifyToken, async (req, res) => {
+router.get("/profile", lightVerifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -466,7 +467,7 @@ router.get("/profile", verifyToken, async (req, res) => {
 });
 
 // UPDATE PROFILE
-router.put("/profile", verifyToken, async (req, res) => {
+router.put("/profile", lightVerifyToken, async (req, res) => {
   try {
     const {
       full_name,
