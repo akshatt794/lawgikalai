@@ -104,4 +104,5 @@ router.get("/list", verifyToken, async (req, res) => {
 });
 
 // Export both router and broadcast function
-module.exports = { router, sendNotificationToAllUsers };
+module.exports = router;
+module.exports.sendNotificationToAllUsers = sendNotificationToAllUsers;

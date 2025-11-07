@@ -4,7 +4,8 @@ const Announcement = require("../models/Announcement");
 
 // 🔐 Optional auth middleware (uncomment if needed)
 const jwt = require("jsonwebtoken");
-const { sendNotificationToAllUsers } = require("./notifications");
+const notifications = require("./notifications");
+const { sendNotificationToAllUsers } = notifications;
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
 // JWT auth middleware
