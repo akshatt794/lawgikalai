@@ -6,6 +6,7 @@ const Announcement = require("../models/Announcement");
 const Case = require("../models/Case");
 const News = require("../models/News");
 const { verifyToken } = require("../middleware/verifyToken");
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 // ===== AWS (optional presign) =====
 const REGION =
@@ -156,7 +157,7 @@ function safeDateExpr(jsonPath) {
 }
 
 // ========== GET /api/home ==========
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", lightVerifyToken, async (req, res) => {
   try {
     const userId = String(req.user.userId || "");
     const now = new Date();

@@ -3,13 +3,14 @@ const router = express.Router();
 const { OpenAI } = require("openai");
 const { verifyToken } = require("../middleware/verifyToken");
 const User = require("../models/User"); // 👈 import your user model
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // ✅ Add verifyToken middleware to identify user
-router.post("/draft", verifyToken, async (req, res) => {
+router.post("/draft", lightVerifyToken, async (req, res) => {
   const { prompt } = req.body;
   const userId = req.user.userId || req.user.id || req.user._id;
 
@@ -74,7 +75,7 @@ router.post("/draft", verifyToken, async (req, res) => {
 
 //for mobile
 // ✅ Mobile-friendly AI draft (non-streaming)
-router.post("/draft/mobile", verifyToken, async (req, res) => {
+router.post("/draft/mobile", lightVerifyToken, async (req, res) => {
   const { prompt } = req.body;
   const userId = req.user.userId || req.user.id || req.user._id;
 
@@ -125,7 +126,7 @@ router.post("/draft/mobile", verifyToken, async (req, res) => {
 });
 
 // ✅ GET /api/ai/usage - returns remaining prompts for today
-router.get("/usage", verifyToken, async (req, res) => {
+router.get("/usage", lightVerifyToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id || req.user._id;
     const user = await User.findById(userId);
