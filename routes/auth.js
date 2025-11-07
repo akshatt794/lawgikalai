@@ -452,7 +452,7 @@ router.get("/profile", lightVerifyToken, async (req, res) => {
     res.json({
       full_name: user.fullName,
       mobile_number: user.mobileNumber,
-      email: user.email,
+      email: user.email || user.identifier,
       bar_council_id: user.barCouncilId,
       qualification: user.qualification,
       experience: user.experience,
