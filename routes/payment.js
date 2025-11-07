@@ -95,8 +95,13 @@ router.post("/verify", async (req, res) => {
     const txn = await Transaction.findById(txnId);
     if (!txn) return res.status(404).json({ error: "Transaction not found" });
 
+    // ✅ Use the merchant transaction ID (PhonePe’s)
+    const orderId =
+      txn.merchantTransactionId || txn.txnId || txn._id.toString();
+
     const response = await phonePeClient.getOrderStatus(txn._id.toString());
     const state = response?.state;
+    const now = new Date();
 
     if (state === "COMPLETED") {
       txn.status = "success";
