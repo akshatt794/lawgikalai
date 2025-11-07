@@ -4,6 +4,7 @@ const Case = require("../models/Case");
 const { verifyToken } = require("../middleware/verifyToken");
 const jwt = require("jsonwebtoken"); // required for legacy fallback
 const mongoose = require("mongoose");
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 // ✅ Utility to generate case_id
 function generateCaseId() {
@@ -14,7 +15,7 @@ function generateCaseId() {
 }
 
 // ✅ Add Case API (Protected)
-router.post("/add", verifyToken, async (req, res) => {
+router.post("/add", lightVerifyToken, async (req, res) => {
     try {
         const userId = req.user.userId || req.user.id || req.user._id;
 
@@ -38,7 +39,7 @@ router.post("/add", verifyToken, async (req, res) => {
 });
 
 // ✅ Get case list for logged-in user with status filter
-router.get("/list", verifyToken, async (req, res) => {
+router.get("/list", lightVerifyToken, async (req, res) => {
     try {
         const { status, page = 1, limit = 10, search = "" } = req.query;
         const query = {
@@ -79,7 +80,7 @@ router.get("/list", verifyToken, async (req, res) => {
 });
 
 // ✅ Edit a case by case_id or _id (if user owns it)
-router.put("/", verifyToken, async (req, res) => {
+router.put("/", lightVerifyToken, async (req, res) => {
   try {
     const { caseId } = req.query;
     if (!caseId) {
@@ -130,7 +131,7 @@ router.put("/", verifyToken, async (req, res) => {
 
 
 // ✅ Get details of a case by either Mongo _id or custom case_id
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", lightVerifyToken, async (req, res) => {
     try {
         const caseId = req.query.caseId;
 
@@ -161,7 +162,7 @@ router.get("/", verifyToken, async (req, res) => {
 
 
 // ✅ Delete a case by case_id (only if user owns it)
-router.delete("/", verifyToken, async (req, res) => {
+router.delete("/", lightVerifyToken, async (req, res) => {
     try {
         const { caseId } = req.query;
 
