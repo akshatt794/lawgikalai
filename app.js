@@ -19,6 +19,26 @@ let uri = sanitizeUri(process.env.DOCUMENTDB_URI || "");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
+console.log("🔍 Route types check:");
+console.log("authRoutes:", typeof authRoutes);
+console.log("newsRoutes:", typeof newsRoutes);
+console.log("exploreCourtRoutes:", typeof exploreCourtRoutes);
+console.log("homeRoutes:", typeof homeRoutes);
+console.log("caseRoutes:", typeof caseRoutes);
+console.log("documentRoutes:", typeof documentRoutes);
+console.log("ordersRoutes:", typeof ordersRoutes);
+console.log("announcementRoutes:", typeof announcementRoutes);
+console.log("subscriptionRoutes:", typeof subscriptionRoutes);
+console.log("courtRoutes:", typeof courtRoutes);
+console.log("testDocumentDbRoute:", typeof testDocumentDbRoute);
+console.log("aiDraftingRoutes:", typeof aiDraftingRoutes);
+console.log("notificationsRoutes:", typeof notificationsRoutes);
+console.log("generalDocumentRoutes:", typeof generalDocumentRoutes);
+console.log("bailRosterRoutes:", typeof bailRosterRoutes);
+console.log("judgesListRoutes:", typeof judgesListRoutes);
+console.log("exploreFormRoutes:", typeof exploreFormRoutes);
+console.log("paymentRoutes:", typeof paymentRoutes);
+
 // Route imports
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/news");
