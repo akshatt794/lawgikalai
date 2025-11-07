@@ -122,6 +122,22 @@ router.delete("/delete/:id", auth, async (req, res) => {
   }
 });
 
+// ✅ Get single announcement by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id);
+    if (!announcement)
+      return res.status(404).json({ error: "Announcement not found" });
+
+    res.json({
+      message: "Announcement fetched successfully",
+      data: announcement,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
+
 /* ==========================================================
    ✅ NEW: GET /api/announcements/all
    Fetch all announcements (paginated)
