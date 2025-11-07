@@ -108,6 +108,8 @@ app.use(
   })
 );
 
+require("./jobs/notificationScheduler");
+
 /* ================== ROUTES ================== */
 
 app.use("/api/auth", authRoutes);

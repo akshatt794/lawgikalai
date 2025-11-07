@@ -4,6 +4,7 @@ const Announcement = require("../models/Announcement");
 
 // 🔐 Optional auth middleware (uncomment if needed)
 const jwt = require("jsonwebtoken");
+const { sendNotificationToAllUsers } = require("./notifications");
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
 // JWT auth middleware
@@ -62,8 +63,14 @@ router.post("/add", auth, async (req, res) => {
     const newAnnouncement = new Announcement({ title, content });
     await newAnnouncement.save();
 
+    // ✅ Broadcast notification to all users
+    await sendNotificationToAllUsers(
+      `New Announcement: ${title}`,
+      content.slice(0, 80) + "..." // short preview
+    );
+
     res.json({
-      message: "Announcement added successfully",
+      message: "Announcement added and notification sent successfully",
       announcement: newAnnouncement,
     });
   } catch (err) {
