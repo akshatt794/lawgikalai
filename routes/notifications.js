@@ -1,16 +1,16 @@
 // /routes/notifications.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const admin = require('../utils/firebase');
-const User = require('../models/User'); // Make sure this has 'fcmToken' field
-const Notification = require('../models/Notification');
-const {verifyToken} = require('../middleware/verifyToken');
+const admin = require("../utils/firebase");
+const User = require("../models/User");
+const Notification = require("../models/Notification");
+const { verifyToken } = require("../middleware/verifyToken");
 
 // ✅ Save FCM token for the logged-in user
-router.post('/save-token', verifyToken, async (req, res) => {
+router.post("/save-token", verifyToken, async (req, res) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ error: 'FCM token is required' });
+    if (!token) return res.status(400).json({ error: "FCM token is required" });
 
     const user = await User.findByIdAndUpdate(
       req.user.userId,
@@ -18,56 +18,90 @@ router.post('/save-token', verifyToken, async (req, res) => {
       { new: true }
     );
 
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ message: 'FCM token saved successfully', user });
+    res.json({ message: "FCM token saved successfully", user });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to save token', details: err.message });
+    res
+      .status(500)
+      .json({ error: "Failed to save token", details: err.message });
   }
 });
 
-// ✅ Send notification to a logged-in user
-router.post('/send', verifyToken, async (req, res) => {
+// ✅ Helper: Send notification to all users
+async function sendNotificationToAllUsers(title, body) {
   try {
-    const { title, body, token: bodyToken } = req.body;
+    const users = await User.find({ fcmToken: { $exists: true, $ne: "" } });
 
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!users.length) {
+      console.log("⚠️ No users with FCM token found.");
+      return { success: false, message: "No users with FCM tokens" };
+    }
 
-    const token = bodyToken || user.fcmToken;
-    if (!token) return res.status(400).json({ error: 'FCM token not found for user' });
+    const tokens = users.map((u) => u.fcmToken);
 
+    // Batch notifications using FCM multicast
     const message = {
       notification: { title, body },
-      token
+      tokens, // up to 500 tokens per batch
     };
 
-    const fcmResponse = await admin.messaging().send(message);
+    const fcmResponse = await admin.messaging().sendEachForMulticast(message);
 
-    // Save notification in DB
-    const savedNotification = await Notification.create({
+    // Save notification record for each user
+    const notifications = users.map((u) => ({
+      userId: u._id,
       title,
       body,
-      userId: user._id
-    });
+    }));
+    await Notification.insertMany(notifications);
 
-    res.json({ success: true, fcmResponse, savedNotification });
+    console.log(`✅ Sent notifications to ${users.length} users.`);
+    return { success: true, count: users.length, fcmResponse };
   } catch (err) {
-    res.status(500).json({ error: 'Failed to send notification', details: err.message });
+    console.error("❌ Error sending broadcast notification:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// ✅ Send notification to a single logged-in user
+router.post("/send", verifyToken, async (req, res) => {
+  try {
+    const { title, body, token: bodyToken } = req.body;
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const token = bodyToken || user.fcmToken;
+    if (!token)
+      return res.status(400).json({ error: "FCM token not found for user" });
+
+    const message = { notification: { title, body }, token };
+    const fcmResponse = await admin.messaging().send(message);
+
+    await Notification.create({ title, body, userId: user._id });
+
+    res.json({ success: true, fcmResponse });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Failed to send notification", details: err.message });
   }
 });
 
 // ✅ Get notification list for the logged-in user
-router.get('/list', verifyToken, async (req, res) => {
+router.get("/list", verifyToken, async (req, res) => {
   try {
-    const notifications = await Notification.find({ userId: req.user.userId })
-    .sort({ createdAt: -1 });
+    const notifications = await Notification.find({
+      userId: req.user.userId,
+    }).sort({ sentAt: -1 });
 
     res.json({ notifications });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch notifications', details: err.message });
+    res
+      .status(500)
+      .json({ error: "Failed to fetch notifications", details: err.message });
   }
 });
 
-module.exports = router; 
-
+// Export both router and broadcast function
+module.exports = { router, sendNotificationToAllUsers };

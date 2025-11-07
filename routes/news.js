@@ -3,6 +3,7 @@ const multer = require("multer");
 const News = require("../models/News");
 const { uploadToS3, getPresignedUrl } = require("../utils/s3Client");
 const { s3 } = require("../utils/s3Client");
+const { sendNotificationToAllUsers } = require("./notifications");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() }); // store in memory buffer
@@ -42,10 +43,19 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     });
 
     await news.save();
+    // ✅ Broadcast notification to all users
+    await sendNotificationToAllUsers(
+      `📰 Latest News: ${title}`,
+      content.slice(0, 80) + "..."
+    );
 
     res
       .status(201)
-      .json({ ok: true, message: "News uploaded successfully", news });
+      .json({
+        ok: true,
+        message: "News uploaded and notification sent successfully",
+        news,
+      });
   } catch (err) {
     console.error("❌ Upload News Error:", err);
     res.status(500).json({ ok: false, error: "Server error" });
