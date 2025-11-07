@@ -103,7 +103,10 @@ router.post("/verify", async (req, res) => {
       await txn.save();
 
       const user = await User.findById(txn.userId);
-      const start = new Date(); // ✅ unique payment timestamp
+      const previousEnd = user.plan?.endDate
+        ? new Date(user.plan.endDate)
+        : null;
+      const start = previousEnd && previousEnd > now ? previousEnd : now; // ✅ unique payment timestamp
       const end = new Date(start.getTime()); // ✅ clone exact time
 
       const planName = txn.planName.toLowerCase();
@@ -121,7 +124,8 @@ router.post("/verify", async (req, res) => {
         end.setMonth(end.getMonth() + 6);
       } else if (
         planName.includes("12 months") ||
-        planName.includes("1 year") || planName.includes("12 Months")
+        planName.includes("1 year") ||
+        planName.includes("12 Months")
       ) {
         end.setFullYear(end.getFullYear() + 1);
       } else {
@@ -129,15 +133,12 @@ router.post("/verify", async (req, res) => {
         end.setMonth(end.getMonth() + 1); // fallback to 1 month
       }
 
-      console.log("🕒 Start Date:", start);
-      console.log("🕓 End Date:", end);
-      console.log("🧾 Plan:", txn.planName);
-
       user.plan = {
         name: txn.planName,
         startDate: start,
         endDate: end,
       };
+      user.trial = { started: false, startDate: null, endDate: null };
 
       await user.save();
 
