@@ -8,75 +8,75 @@ const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 // ✅ Utility to generate case_id
 function generateCaseId() {
-    const date = new Date();
-    const yyyymmdd = date.toISOString().split("T")[0].replace(/-/g, "");
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-    return `CASE-${yyyymmdd}-${random}`;
+  const date = new Date();
+  const yyyymmdd = date.toISOString().split("T")[0].replace(/-/g, "");
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `CASE-${yyyymmdd}-${random}`;
 }
 
 // ✅ Add Case API (Protected)
 router.post("/add", lightVerifyToken, async (req, res) => {
-    try {
-        const userId = req.user.userId || req.user.id || req.user._id;
+  try {
+    const userId = req.user.userId || req.user.id || req.user._id;
 
-        const caseData = {
-            ...req.body,
-            case_id: generateCaseId(),
-            userId,
-        };
+    const caseData = {
+      ...req.body,
+      case_id: generateCaseId(),
+      userId,
+    };
 
-        const newCase = new Case(caseData);
-        await newCase.save();
+    const newCase = new Case(caseData);
+    await newCase.save();
 
-        // ✅ Only send message, no case data
-        res.json({ message: "Case added successfully" });
-    } catch (err) {
-        res.status(500).json({
-            error: "Something broke!",
-            details: err.message,
-        });
-    }
+    // ✅ Only send message, no case data
+    res.json({ message: "Case added successfully" });
+  } catch (err) {
+    res.status(500).json({
+      error: "Something broke!",
+      details: err.message,
+    });
+  }
 });
 
 // ✅ Get case list for logged-in user with status filter
 router.get("/list", lightVerifyToken, async (req, res) => {
-    try {
-        const { status, page = 1, limit = 10, search = "" } = req.query;
-        const query = {
-            userId: new mongoose.Types.ObjectId(req.user.userId),
-        };
+  try {
+    const { status, page = 1, limit = 10, search = "" } = req.query;
+    const query = {
+      userId: new mongoose.Types.ObjectId(req.user.userId),
+    };
 
-        if (status) {
-            query.case_status = { $regex: `^${status}$`, $options: "i" };
-        }
-
-        if (search) {
-            query.case_title = { $regex: search, $options: "i" }; // 🔍 case-insensitive title match
-        }
-
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        const cases = await Case.find(query)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit))
-            .select(
-                "case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status"
-            );
-
-        const total = await Case.countDocuments(query);
-
-        res.json({
-            message: "Cases fetched successfully",
-            currentPage: parseInt(page),
-            totalPages: Math.ceil(total / limit),
-            totalItems: total,
-            count: cases.length,
-            data: cases,
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Server error", details: err.message });
+    if (status) {
+      query.case_status = { $regex: `^${status}$`, $options: "i" };
     }
+
+    if (search) {
+      query.case_title = { $regex: search, $options: "i" }; // 🔍 case-insensitive title match
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const cases = await Case.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select(
+        "case_id case_title client_info.client_name court_name hearing_details.next_hearing_date case_status"
+      );
+
+    const total = await Case.countDocuments(query);
+
+    res.json({
+      message: "Cases fetched successfully",
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      count: cases.length,
+      data: cases,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
 });
 
 // ✅ Edit a case by case_id or _id (if user owns it)
@@ -100,96 +100,103 @@ router.put("/", lightVerifyToken, async (req, res) => {
 
     // ✅ Clean document list
     const newDocs = Array.isArray(req.body.documents) ? req.body.documents : [];
-    const validDocs = newDocs.map(doc => ({
-      file_name: doc.file_name || doc.name || "",
-      file_url: doc.file_url || doc.url || "",
-      _id: doc._id || doc.id || undefined
-    })).filter(doc => doc.file_url);
+    const validDocs = newDocs
+      .map((doc) => ({
+        file_name: doc.file_name || doc.name || "",
+        file_url: doc.file_url || doc.url || "",
+        _id: doc._id || doc.id || undefined,
+      }))
+      .filter((doc) => doc.file_url);
 
     // ✅ Update case fields
     existingCase.set({
       ...req.body,
-      documents: validDocs
+      documents: validDocs,
     });
 
     const updated = await existingCase.save();
 
     res.json({
       message: "Case updated successfully",
-      data: updated
+      data: updated,
     });
-
   } catch (err) {
     console.error("Update Error:", err);
     res.status(500).json({
       error: "Failed to update case",
-      details: err.message
+      details: err.message,
     });
   }
 });
 
-
-
 // ✅ Get details of a case by either Mongo _id or custom case_id
 router.get("/", lightVerifyToken, async (req, res) => {
-    try {
-        const caseId = req.query.caseId;
+  try {
+    const caseId = req.query.caseId;
+    const userId = req.user.userId;
 
-        if (!caseId) {
-            return res.status(400).json({ error: "Missing caseId parameter" });
-        }
+    if (caseId) {
+      // Try to find by case_id first, then _id
+      const caseDetails =
+        (await Case.findOne({ case_id: caseId })) ||
+        (await Case.findById(caseId));
 
-        // Try to find by case_id first, then _id
-        const caseDetails =
-            (await Case.findOne({ case_id: caseId })) ||
-            (await Case.findById(caseId));
+      if (!caseDetails) {
+        return res.status(404).json({ error: "Case not found" });
+      }
 
-        if (!caseDetails) {
-            return res.status(404).json({ error: "Case not found" });
-        }
+      res.json({
+        message: "Case details fetched successfully",
+        data: caseDetails,
+      });
+    } else {
+      // 🟡 Fetch all cases for this user (for homepage or dashboard)
+      const cases = await Case.find({ userId })
+        .sort({ "hearing_details.next_hearing_date": 1 })
+        .lean();
 
-        res.json({
-            message: "Case details fetched successfully",
-            data: caseDetails,
-        });
-    } catch (err) {
-        res.status(500).json({
-            error: "Server error while fetching case details",
-            details: err.message,
-        });
+      return res.json({
+        message: "All cases fetched successfully",
+        data: cases,
+      });
     }
+  } catch (err) {
+    res.status(500).json({
+      error: "Server error while fetching case details",
+      details: err.message,
+    });
+  }
 });
-
 
 // ✅ Delete a case by case_id (only if user owns it)
 router.delete("/", lightVerifyToken, async (req, res) => {
-    try {
-        const { caseId } = req.query;
+  try {
+    const { caseId } = req.query;
 
-        if (!caseId) {
-            return res.status(400).json({ error: "Missing caseId parameter" });
-        }
-
-        const deletedCase = await Case.findOneAndDelete({
-            case_id: caseId,
-            userId: req.user.userId,
-        });
-
-        if (!deletedCase) {
-            return res
-                .status(404)
-                .json({ error: "Case not found or not authorized to delete" });
-        }
-
-        res.json({
-            message: "Case deleted successfully",
-            case: deletedCase,
-        });
-    } catch (err) {
-        res.status(500).json({
-            error: "Failed to delete case",
-            details: err.message,
-        });
+    if (!caseId) {
+      return res.status(400).json({ error: "Missing caseId parameter" });
     }
+
+    const deletedCase = await Case.findOneAndDelete({
+      case_id: caseId,
+      userId: req.user.userId,
+    });
+
+    if (!deletedCase) {
+      return res
+        .status(404)
+        .json({ error: "Case not found or not authorized to delete" });
+    }
+
+    res.json({
+      message: "Case deleted successfully",
+      case: deletedCase,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to delete case",
+      details: err.message,
+    });
+  }
 });
 module.exports = router;
