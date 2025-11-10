@@ -103,6 +103,45 @@ router.get("/list", verifyToken, async (req, res) => {
   }
 });
 
+// 🧹 DELETE a single notification by ID
+router.delete("/clear/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Notification.findOneAndDelete({
+      _id: id,
+      userId: req.user.userId,
+    });
+
+    if (!deleted)
+      return res
+        .status(404)
+        .json({ error: "Notification not found or unauthorized" });
+
+    res.json({ success: true, message: "Notification cleared." });
+  } catch (err) {
+    console.error("❌ Error clearing notification:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to clear notification", details: err.message });
+  }
+});
+
+// 🧹 DELETE all notifications for this user
+router.delete("/clear-all", verifyToken, async (req, res) => {
+  try {
+    await Notification.deleteMany({ userId: req.user.userId });
+    res.json({ success: true, message: "All notifications cleared." });
+  } catch (err) {
+    console.error("❌ Error clearing all notifications:", err);
+    res
+      .status(500)
+      .json({
+        error: "Failed to clear all notifications",
+        details: err.message,
+      });
+  }
+});
+
 // Export both router and broadcast function
 module.exports = router;
 module.exports.sendNotificationToAllUsers = sendNotificationToAllUsers;
