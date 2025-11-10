@@ -5,9 +5,10 @@ const admin = require("../utils/firebase");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { verifyToken } = require("../middleware/verifyToken");
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 // ✅ Save FCM token for the logged-in user
-router.post("/save-token", verifyToken, async (req, res) => {
+router.post("/save-token", lightVerifyToken, async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) return res.status(400).json({ error: "FCM token is required" });
@@ -133,12 +134,10 @@ router.delete("/clear-all", verifyToken, async (req, res) => {
     res.json({ success: true, message: "All notifications cleared." });
   } catch (err) {
     console.error("❌ Error clearing all notifications:", err);
-    res
-      .status(500)
-      .json({
-        error: "Failed to clear all notifications",
-        details: err.message,
-      });
+    res.status(500).json({
+      error: "Failed to clear all notifications",
+      details: err.message,
+    });
   }
 });
 
