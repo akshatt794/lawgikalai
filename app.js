@@ -38,6 +38,7 @@ const bailRosterRoutes = require("./routes/bailRoster");
 const judgesListRoutes = require("./routes/judgesList");
 const exploreFormRoutes = require("./routes/explore");
 const paymentRoutes = require("./routes/payment");
+const googleAuthRoutes = require("./routes/googleAuth");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
@@ -112,26 +113,6 @@ require("./jobs/notificationScheduler");
 
 /* ================== ROUTES ================== */
 
-console.log("🔍 Route types check:");
-console.log("authRoutes:", typeof authRoutes);
-console.log("newsRoutes:", typeof newsRoutes);
-console.log("exploreCourtRoutes:", typeof exploreCourtRoutes);
-console.log("homeRoutes:", typeof homeRoutes);
-console.log("caseRoutes:", typeof caseRoutes);
-console.log("documentRoutes:", typeof documentRoutes);
-console.log("ordersRoutes:", typeof ordersRoutes);
-console.log("announcementRoutes:", typeof announcementRoutes);
-console.log("subscriptionRoutes:", typeof subscriptionRoutes);
-console.log("courtRoutes:", typeof courtRoutes);
-console.log("testDocumentDbRoute:", typeof testDocumentDbRoute);
-console.log("aiDraftingRoutes:", typeof aiDraftingRoutes);
-console.log("notificationsRoutes:", typeof notificationsRoutes);
-console.log("generalDocumentRoutes:", typeof generalDocumentRoutes);
-console.log("bailRosterRoutes:", typeof bailRosterRoutes);
-console.log("judgesListRoutes:", typeof judgesListRoutes);
-console.log("exploreFormRoutes:", typeof exploreFormRoutes);
-console.log("paymentRoutes:", typeof paymentRoutes);
-
 app.use("/api/auth", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/explore", exploreCourtRoutes);
@@ -157,6 +138,7 @@ app.use("/api/bailroster", bailRosterRoutes);
 app.use("/api/judgelist", judgesListRoutes);
 app.use("/api/explore-form", exploreFormRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/google", googleAuthRoutes);
 
 // Health / base
 app.get("/", (_req, res) => {

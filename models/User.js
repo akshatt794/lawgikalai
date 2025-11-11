@@ -43,6 +43,14 @@ const userSchema = new mongoose.Schema({
     startDate: { type: Date, default: null },
     endDate: { type: Date, default: null },
   },
+
+  google: {
+    accessToken: { type: String, default: null },
+    refreshToken: { type: String, default: null },
+    expiryDate: { type: Date, default: null },
+    email: { type: String, default: null },
+    connected: { type: Boolean, default: false },
+  },
 });
 
 module.exports = mongoose.model("User", userSchema);
