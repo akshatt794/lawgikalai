@@ -346,47 +346,116 @@ If you do not agree with these Terms, please discontinue using the application i
     1: {
       title: "Privacy Policy",
       content: `
-At LawgicalAI, we respect your privacy and are committed to protecting the confidentiality of your information. This Privacy Policy explains how we collect, use, and safeguard your data.
+At LawgicalAI, we respect your privacy and are committed to protecting the confidentiality of your information. This Privacy Policy explains how we collect, use, and safeguard your data, including information obtained through Google APIs.
 
-1. **Information We Collect**  
-   - **Account Information**: Name, email address, and login credentials.  
-   - **Case Data**: Information you voluntarily upload regarding client cases.  
-   - **Technical Data**: Device information, IP address, and usage logs for security and performance.  
+---
 
-2. **How We Use Your Information**  
-   - To provide and improve our services.  
-   - To ensure security, authentication, and account management.  
-   - To comply with legal obligations when required.  
-   - We do **not** sell, rent, or share your personal or case data with third parties for marketing purposes.  
+## 1. Information We Collect
+We may collect and process the following types of information:
 
-3. **Data Confidentiality**  
-   - All case data remains your property.  
-   - We treat uploaded case data as strictly confidential and will not access or disclose it except:  
-     (a) with your consent, or  
-     (b) when legally required.  
+- **Account Information**: Name, email address, and login credentials used for authentication.
+- **Case Data**: Information you voluntarily upload regarding client cases, hearings, and related notes.
+- **Technical Data**: Device information, IP address, and usage logs to ensure performance and security.
+- **Google User Data (if connected)**: With your explicit consent, we may access limited Google data (such as Google Calendar and your account email) to enable synchronization features.
 
-4. **Data Security**  
-   - We use industry-standard encryption and security measures to protect your data.  
-   - However, no system is completely secure, and we cannot guarantee absolute security.  
+---
 
-5. **Third-Party Services**  
-   - We may use trusted third-party providers (such as cloud hosting or email services) to support our operations.  
-   - These providers are contractually obligated to maintain the confidentiality and security of your data.  
+## 2. How We Use Your Information
+We use the information we collect to:
 
-6. **Your Rights**  
-   - You have the right to access, correct, or delete your personal information stored with us.  
-   - You may request account deletion at any time, subject to applicable law.  
+- Provide, maintain, and improve our services.
+- Authenticate users and manage accounts securely.
+- Enable Google Calendar synchronization for hearing events.
+- Comply with legal obligations when required by law.
 
-7. **Data Retention**  
-   - We retain case data only as long as necessary to provide services or comply with legal obligations.  
-   - Deleted case data is permanently removed from our systems within a reasonable timeframe.  
+We do **not** sell, rent, or share your personal or case data with any third parties for advertising or marketing purposes.
 
-8. **Changes to Privacy Policy**  
-   We may update this Privacy Policy from time to time. Continued use of LawgicalAI constitutes acceptance of the revised policy.  
+---
 
-9. **Contact Us**  
-   If you have questions or concerns about this Privacy Policy, please contact us at:  
-   **management@lawgikalai.com**
+## 3. Data Confidentiality
+- All case and client data remains your exclusive property.
+- Uploaded case information is treated as strictly confidential.
+- LawgicalAI will only access or disclose data:
+  - (a) with your explicit consent, or  
+  - (b) when required by law.
+
+---
+
+## 4. Data Security
+- We implement industry-standard encryption and security protocols to protect your data.
+- Access to user data is strictly limited to authorized personnel for operational purposes only.
+- While we take all reasonable precautions, no online service is completely secure, and we cannot guarantee absolute security.
+
+---
+
+## 5. Google User Data Access
+LawgicalAI integrates with Google APIs to provide features such as Google Calendar synchronization.  
+When you connect your Google account, we may access the following information with your permission:
+
+- **Google Calendar** — to create, update, and delete events related to your legal cases.
+- **Google Account Email** — to identify and link your calendar integration to your account.
+
+We do **not** access or store your calendar history beyond what is necessary for synchronization.  
+Your Google data is encrypted and never shared with third parties.
+
+---
+
+## 6. Use of Google User Data
+LawgicalAI’s use and transfer of information received from Google APIs adhere to the  
+[Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the  
+[Limited Use requirements](https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes).
+
+Specifically:
+- We only use Google user data to provide core app functionality (e.g., case hearing sync).
+- We do **not** use Google data for advertising, analytics, or unrelated operations.
+- We do **not** allow humans to read Google user data unless required for security, legal compliance, or with your explicit consent.
+
+---
+
+## 7. Revoking Access to Google Data
+You can revoke LawgicalAI’s access to your Google account at any time by:
+
+- Using the “Disconnect Google Calendar” option inside the LawgicalAI app, or  
+- Visiting your [Google Account Permissions](https://myaccount.google.com/permissions) page and removing LawgicalAI access.
+
+Once disconnected, all Google access tokens and associated data are deleted from our systems within 24 hours.
+
+---
+
+## 8. Third-Party Services
+We may use trusted third-party providers (e.g., cloud hosting, email delivery) to support operations.  
+These providers are contractually bound to maintain confidentiality and follow strict data security standards.
+
+---
+
+## 9. Your Rights
+You have the right to:
+- Access, correct, or delete your personal information stored with us.
+- Request account deletion or data export at any time, subject to legal obligations.
+
+---
+
+## 10. Data Retention
+We retain user and case data only as long as necessary to provide services or comply with legal requirements.  
+Deleted data is permanently removed from our systems within a reasonable timeframe.
+
+---
+
+## 11. Changes to Privacy Policy
+We may update this Privacy Policy periodically to reflect improvements or new legal requirements.  
+You will be notified of any significant changes via the app or our website. Continued use of LawgicalAI constitutes acceptance of the updated terms.
+
+---
+
+## 12. Contact Us
+If you have any questions, concerns, or privacy requests, please contact our Privacy Officer:
+
+**Email:** management@lawgikalai.com  
+**Address:** LawgicalAI, Delhi, India  
+
+---
+
+*Last Updated: November 2025*
   `,
     },
 
