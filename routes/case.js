@@ -112,7 +112,7 @@ router.put("/", lightVerifyToken, async (req, res) => {
       return res.status(404).json({ error: "Case not found" });
     }
 
-    // ✅ Clean document list
+    // ✅ Prepare cleaned documents list
     const newDocs = Array.isArray(req.body.documents) ? req.body.documents : [];
     const validDocs = newDocs
       .map((doc) => ({
@@ -122,28 +122,62 @@ router.put("/", lightVerifyToken, async (req, res) => {
       }))
       .filter((doc) => doc.file_url);
 
-    // ✅ Update case fields
+    // ✅ Update core fields
     existingCase.set({
       ...req.body,
       documents: validDocs,
     });
 
+    // ✅ Save updated case first
     const updated = await existingCase.save();
-    // attempt to upsert calendar event
+
+    // ✅ Update or create Google Calendar event
     try {
       const existingEventId = updated.hearing_details?.googleEventId || null;
-      const newEventId = await upsertEventForCase(
-        req.user.userId,
-        updated.toObject(),
-        existingEventId
-      );
-      if (newEventId && newEventId !== existingEventId) {
-        updated.hearing_details = updated.hearing_details || {};
-        updated.hearing_details.googleEventId = newEventId;
-        await updated.save();
+
+      // check if hearing date or time changed compared to old record
+      const oldDate =
+        existingCase.hearing_details?.next_hearing_date?.toString() || "";
+      const oldTime = existingCase.hearing_details?.time || "";
+      const newDate = req.body.hearing_details?.next_hearing_date || oldDate;
+      const newTime = req.body.hearing_details?.time || oldTime;
+
+      const dateChanged = newDate !== oldDate;
+      const timeChanged = newTime !== oldTime;
+
+      // Only update Google Calendar if connected
+      if (existingEventId) {
+        const newEventId = await upsertEventForCase(
+          req.user.userId,
+          updated.toObject(),
+          existingEventId
+        );
+
+        if (newEventId && newEventId !== existingEventId) {
+          updated.hearing_details = updated.hearing_details || {};
+          updated.hearing_details.googleEventId = newEventId;
+          await updated.save();
+        }
+      } else {
+        // If user connected Google Calendar but eventId missing → create new
+        const newEventId = await createEventForCase(
+          req.user.userId,
+          updated.toObject()
+        );
+        if (newEventId) {
+          updated.hearing_details = updated.hearing_details || {};
+          updated.hearing_details.googleEventId = newEventId;
+          await updated.save();
+        }
       }
+
+      console.log(
+        `✅ Calendar sync successful for case ${updated.case_id} (${
+          dateChanged ? "date changed" : ""
+        } ${timeChanged ? "time changed" : ""})`
+      );
     } catch (err) {
-      console.warn("Calendar upsert error (non-fatal):", err?.message || err);
+      console.warn("Calendar sync error (non-fatal):", err?.message || err);
     }
 
     res.json({

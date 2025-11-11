@@ -21,19 +21,19 @@ async function ensureOAuthClientForUser(user) {
       : null,
   });
 
-  // If access token expired or near expiry, refresh
+  // refresh token if expired
   const expiry = user.google?.expiryDate
     ? new Date(user.google.expiryDate).getTime()
     : 0;
   const now = Date.now();
+
   if (user.google?.refreshToken && expiry && expiry - now < 60 * 1000) {
-    // refresh token
     try {
       const r = await oauth2Client.refreshToken(user.google.refreshToken);
       const tokens = r.credentials || r;
       oauth2Client.setCredentials(tokens);
 
-      // persist new access token & expiry
+      // persist refreshed token
       user.google.accessToken = tokens.access_token || user.google.accessToken;
       if (tokens.refresh_token) user.google.refreshToken = tokens.refresh_token;
       if (tokens.expiry_date)
@@ -41,7 +41,6 @@ async function ensureOAuthClientForUser(user) {
       await user.save();
     } catch (err) {
       console.error("Failed to refresh Google token:", err?.message || err);
-      // do not throw — caller will treat as not connected
     }
   }
 
@@ -49,8 +48,20 @@ async function ensureOAuthClientForUser(user) {
 }
 
 /**
- * Create calendar event for a case. Returns created eventId or null.
- * caseData must contain: case_title, hearing_details.next_hearing_date, hearing_details.time, client_info.client_name, court_name
+ * Helper — build event start and end times in IST (Asia/Kolkata)
+ */
+function buildISTEventTimes(dateStr, timeStr = "08:00") {
+  const [hh, mm] = timeStr.split(":");
+  // Build explicit IST datetime with offset +05:30
+  const localStart = new Date(
+    `${dateStr}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:00+05:30`
+  );
+  const localEnd = new Date(localStart.getTime() + 60 * 60 * 1000); // +1 hour
+  return { localStart, localEnd };
+}
+
+/**
+ * Create calendar event for a case.
  */
 async function createEventForCase(userId, caseData) {
   try {
@@ -60,21 +71,9 @@ async function createEventForCase(userId, caseData) {
     const oauth2Client = await ensureOAuthClientForUser(user);
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-    const start = new Date(caseData.hearing_details.next_hearing_date);
-    // Use hearing_details.time if present (time part may be in separate field)
-    if (caseData.hearing_details.time) {
-      // if next_hearing_date has no time, combine with time (assumes 'HH:MM' string)
-      // otherwise assume next_hearing_date already has time
-      if (!/T/.test(caseData.hearing_details.next_hearing_date)) {
-        const t = caseData.hearing_details.time;
-        const [hh, mm] = (t || "").split(":");
-        if (hh !== undefined) {
-          start.setHours(Number(hh || 9), Number(mm || 0), 0, 0);
-        }
-      }
-    }
-
-    const end = new Date(start.getTime() + 60 * 60 * 1000); // default 1 hour
+    const dateStr = caseData.hearing_details?.next_hearing_date;
+    const timeStr = caseData.hearing_details?.time || "08:00"; // fallback to 8AM
+    const { localStart, localEnd } = buildISTEventTimes(dateStr, timeStr);
 
     const event = {
       summary: `Hearing: ${caseData.case_title}`,
@@ -83,8 +82,8 @@ async function createEventForCase(userId, caseData) {
       }\nCourt: ${caseData.court_name || "-"}\nNotes: ${
         caseData.hearing_details?.note || "-"
       }`,
-      start: { dateTime: start.toISOString(), timeZone: "Asia/Kolkata" },
-      end: { dateTime: end.toISOString(), timeZone: "Asia/Kolkata" },
+      start: { dateTime: localStart.toISOString(), timeZone: "Asia/Kolkata" },
+      end: { dateTime: localEnd.toISOString(), timeZone: "Asia/Kolkata" },
     };
 
     const created = await calendar.events.insert({
@@ -100,8 +99,7 @@ async function createEventForCase(userId, caseData) {
 }
 
 /**
- * Update event if eventId exists. If not exists, create new and return new id.
- * Expects caseData and existingEventId (may be null).
+ * Update or create event for a case.
  */
 async function upsertEventForCase(userId, caseData, existingEventId) {
   try {
@@ -111,16 +109,9 @@ async function upsertEventForCase(userId, caseData, existingEventId) {
     const oauth2Client = await ensureOAuthClientForUser(user);
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-    const start = new Date(caseData.hearing_details.next_hearing_date);
-    if (
-      caseData.hearing_details.time &&
-      !/T/.test(caseData.hearing_details.next_hearing_date)
-    ) {
-      const [hh, mm] = (caseData.hearing_details.time || "").split(":");
-      if (hh !== undefined)
-        start.setHours(Number(hh || 9), Number(mm || 0), 0, 0);
-    }
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const dateStr = caseData.hearing_details?.next_hearing_date;
+    const timeStr = caseData.hearing_details?.time || "08:00";
+    const { localStart, localEnd } = buildISTEventTimes(dateStr, timeStr);
 
     const event = {
       summary: `Hearing: ${caseData.case_title}`,
@@ -129,8 +120,8 @@ async function upsertEventForCase(userId, caseData, existingEventId) {
       }\nCourt: ${caseData.court_name || "-"}\nNotes: ${
         caseData.hearing_details?.note || "-"
       }`,
-      start: { dateTime: start.toISOString(), timeZone: "Asia/Kolkata" },
-      end: { dateTime: end.toISOString(), timeZone: "Asia/Kolkata" },
+      start: { dateTime: localStart.toISOString(), timeZone: "Asia/Kolkata" },
+      end: { dateTime: localEnd.toISOString(), timeZone: "Asia/Kolkata" },
     };
 
     if (existingEventId) {
@@ -142,9 +133,8 @@ async function upsertEventForCase(userId, caseData, existingEventId) {
         });
         return updated?.data?.id || existingEventId;
       } catch (err) {
-        // if update failed (maybe event deleted), create new event
         console.warn(
-          "update event failed, creating new event:",
+          "Update event failed, creating new event:",
           err?.message || err
         );
         const created = await calendar.events.insert({
@@ -166,11 +156,15 @@ async function upsertEventForCase(userId, caseData, existingEventId) {
   }
 }
 
+/**
+ * Delete an event from the user's calendar.
+ */
 async function deleteEventForCase(userId, eventId) {
   try {
     if (!eventId) return;
     const user = await User.findById(userId);
     if (!user?.google?.accessToken || !user.google.connected) return;
+
     const oauth2Client = await ensureOAuthClientForUser(user);
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     await calendar.events.delete({ calendarId: "primary", eventId });
