@@ -51,19 +51,32 @@ async function ensureOAuthClientForUser(user) {
  * Helper — build event start and end times in IST (Asia/Kolkata)
  */
 function buildISTEventTimes(dateStr, timeStr = "08:00") {
-  if (!dateStr || typeof dateStr !== "string" || dateStr.trim() === "") {
-    throw new Error("Invalid hearing date");
+  if (!dateStr) throw new Error("No hearing date provided");
+
+  // Handle different possible formats (Date object, ISO, string)
+  let dateOnly;
+
+  if (dateStr instanceof Date) {
+    // Already a Date → convert to YYYY-MM-DD
+    dateOnly = dateStr.toISOString().split("T")[0];
+  } else if (typeof dateStr === "string") {
+    // Try extracting only the date part
+    const isoMatch = dateStr.match(/(\d{4}-\d{2}-\d{2})/);
+    dateOnly = isoMatch ? isoMatch[1] : null;
   }
 
+  if (!dateOnly) throw new Error(`Invalid hearing date: ${dateStr}`);
+
   const [hh = "08", mm = "00"] = (timeStr || "08:00").split(":");
-  const isoString = `${dateStr}T${hh.padStart(2, "0")}:${mm.padStart(
+
+  const isoString = `${dateOnly}T${hh.padStart(2, "0")}:${mm.padStart(
     2,
     "0"
   )}:00+05:30`;
 
   const localStart = new Date(isoString);
   if (isNaN(localStart.getTime())) {
-    throw new Error(`Invalid time value: ${isoString}`);
+    throw new Error(`Invalid time value generated: ${isoString}`);
   }
 
   const localEnd = new Date(localStart.getTime() + 60 * 60 * 1000);
