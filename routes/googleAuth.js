@@ -28,6 +28,8 @@ router.post("/save-tokens", lightVerifyToken, async (req, res) => {
     const { code } = req.body;
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
+    console.log("CODE RECEIVED:", req.body.code);
+    console.log("REDIRECT URI:", process.env.GOOGLE_REDIRECT_URI);
 
     const oauth2 = google.oauth2({ auth: oauth2Client, version: "v2" });
     const profile = await oauth2.userinfo.get();
