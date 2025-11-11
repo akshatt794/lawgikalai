@@ -5,6 +5,11 @@ const { verifyToken } = require("../middleware/verifyToken");
 const jwt = require("jsonwebtoken"); // required for legacy fallback
 const mongoose = require("mongoose");
 const { lightVerifyToken } = require("../middleware/lightVerifyToken");
+const {
+  createEventForCase,
+  upsertEventForCase,
+  deleteEventForCase,
+} = require("../utils/googleCalendar");
 
 // ✅ Utility to generate case_id
 function generateCaseId() {
@@ -25,8 +30,17 @@ router.post("/add", lightVerifyToken, async (req, res) => {
       userId,
     };
 
-    const newCase = new Case(caseData);
-    await newCase.save();
+    // try to create calendar event and save its id
+    try {
+      const eventId = await createEventForCase(userId, newCase.toObject());
+      if (eventId) {
+        newCase.hearing_details = newCase.hearing_details || {};
+        newCase.hearing_details.googleEventId = eventId;
+        await newCase.save();
+      }
+    } catch (err) {
+      console.warn("Calendar create error (non-fatal):", err?.message || err);
+    }
 
     // ✅ Only send message, no case data
     res.json({ message: "Case added successfully" });
@@ -115,6 +129,22 @@ router.put("/", lightVerifyToken, async (req, res) => {
     });
 
     const updated = await existingCase.save();
+    // attempt to upsert calendar event
+    try {
+      const existingEventId = updated.hearing_details?.googleEventId || null;
+      const newEventId = await upsertEventForCase(
+        req.user.userId,
+        updated.toObject(),
+        existingEventId
+      );
+      if (newEventId && newEventId !== existingEventId) {
+        updated.hearing_details = updated.hearing_details || {};
+        updated.hearing_details.googleEventId = newEventId;
+        await updated.save();
+      }
+    } catch (err) {
+      console.warn("Calendar upsert error (non-fatal):", err?.message || err);
+    }
 
     res.json({
       message: "Case updated successfully",
@@ -181,6 +211,17 @@ router.delete("/", lightVerifyToken, async (req, res) => {
       case_id: caseId,
       userId: req.user.userId,
     });
+
+    if (deletedCase) {
+      try {
+        const eventId = deletedCase.hearing_details?.googleEventId;
+        if (eventId) {
+          await deleteEventForCase(req.user.userId, eventId);
+        }
+      } catch (err) {
+        console.warn("Calendar delete event failed:", err?.message || err);
+      }
+    }
 
     if (!deletedCase) {
       return res
