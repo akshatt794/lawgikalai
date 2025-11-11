@@ -30,13 +30,27 @@ router.post("/add", lightVerifyToken, async (req, res) => {
       userId,
     };
 
-    // try to create calendar event and save its id
+    // ✅ Create and save the new case first
+    const newCase = new Case(caseData);
+    await newCase.save();
+
+    // ✅ Create Google Calendar event only if hearing date exists
     try {
-      const eventId = await createEventForCase(userId, newCase.toObject());
-      if (eventId) {
-        newCase.hearing_details = newCase.hearing_details || {};
-        newCase.hearing_details.googleEventId = eventId;
-        await newCase.save();
+      const hasDate = !!newCase.hearing_details?.next_hearing_date;
+      if (hasDate) {
+        const eventId = await createEventForCase(userId, newCase.toObject());
+        if (eventId) {
+          newCase.hearing_details = newCase.hearing_details || {};
+          newCase.hearing_details.googleEventId = eventId;
+          await newCase.save();
+          console.log(
+            `✅ Calendar event created for case ${newCase.case_title} (${newCase.case_id})`
+          );
+        }
+      } else {
+        console.log(
+          `⚠️ Skipping Calendar event — no hearing date for case ${newCase.case_id}`
+        );
       }
     } catch (err) {
       console.warn("Calendar create error (non-fatal):", err?.message || err);

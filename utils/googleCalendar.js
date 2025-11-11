@@ -51,12 +51,22 @@ async function ensureOAuthClientForUser(user) {
  * Helper — build event start and end times in IST (Asia/Kolkata)
  */
 function buildISTEventTimes(dateStr, timeStr = "08:00") {
-  const [hh, mm] = timeStr.split(":");
-  // Build explicit IST datetime with offset +05:30
-  const localStart = new Date(
-    `${dateStr}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:00+05:30`
-  );
-  const localEnd = new Date(localStart.getTime() + 60 * 60 * 1000); // +1 hour
+  if (!dateStr || typeof dateStr !== "string" || dateStr.trim() === "") {
+    throw new Error("Invalid hearing date");
+  }
+
+  const [hh = "08", mm = "00"] = (timeStr || "08:00").split(":");
+  const isoString = `${dateStr}T${hh.padStart(2, "0")}:${mm.padStart(
+    2,
+    "0"
+  )}:00+05:30`;
+
+  const localStart = new Date(isoString);
+  if (isNaN(localStart.getTime())) {
+    throw new Error(`Invalid time value: ${isoString}`);
+  }
+
+  const localEnd = new Date(localStart.getTime() + 60 * 60 * 1000);
   return { localStart, localEnd };
 }
 
