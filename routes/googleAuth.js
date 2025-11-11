@@ -77,4 +77,26 @@ router.post("/disconnect", lightVerifyToken, async (req, res) => {
   }
 });
 
+// ✅ Check if Google Calendar is connected for the current user
+router.get("/status", lightVerifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const isConnected =
+      user.google &&
+      user.google.connected &&
+      user.google.accessToken &&
+      user.google.refreshToken;
+
+    res.json({ connected: !!isConnected });
+  } catch (err) {
+    console.error("google/status error:", err.message || err);
+    res.status(500).json({ connected: false, error: "Failed to check status" });
+  }
+});
+
 module.exports = router;
