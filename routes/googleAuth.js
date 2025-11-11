@@ -15,7 +15,10 @@ router.get("/auth-url", lightVerifyToken, (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
-    scope: ["https://www.googleapis.com/auth/calendar"],
+    scope: [
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/userinfo.email",
+    ],
   });
   res.json({ url });
 });
@@ -43,8 +46,13 @@ router.post("/save-tokens", lightVerifyToken, async (req, res) => {
     await user.save();
     res.json({ message: "Google Calendar connected" });
   } catch (err) {
-    console.error("save-tokens error:", err?.message || err);
-    res.status(500).json({ error: "Failed to store tokens" });
+    console.error(
+      "save-tokens error:",
+      err?.response?.data || err?.message || err
+    );
+    res
+      .status(500)
+      .json({ error: "Failed to store tokens", details: err?.message });
   }
 });
 
