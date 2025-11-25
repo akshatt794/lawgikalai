@@ -397,15 +397,7 @@ router.get("/adv-search", async (req, res) => {
             should: [
               {
                 match_phrase: {
-                  content: ` ${query}`,
-                },
-              },
-              {
-                regexp: {
-                  content: {
-                    value: `.*\\b${query}\\b.*`,
-                    case_insensitive: true,
-                  },
+                  content: query,
                 },
               },
               {
@@ -413,11 +405,11 @@ router.get("/adv-search", async (req, res) => {
                   content: {
                     query,
                     operator: "and",
-                    fuzziness: "AUTO",
                   },
                 },
               },
             ],
+            minimum_should_match: 1,
           },
         },
       ],
