@@ -386,16 +386,38 @@ router.get("/adv-search", async (req, res) => {
   if (act) filters.push({ match_phrase: { act } });
   if (section) filters.push({ match_phrase: { section } });
 
+  // ✅ Define sorting
+  const sort = relevanceBool ? [{ _score: "desc" }] : [{ timestamp: "desc" }];
+
   const contentQuery = {
     bool: {
       must: [
         {
-          match: {
-            content: {
-              query,
-              operator: "and",
-              fuzziness: "AUTO",
-            },
+          bool: {
+            should: [
+              {
+                match_phrase: {
+                  content: ` ${query}`,
+                },
+              },
+              {
+                regexp: {
+                  content: {
+                    value: `.*\\b${query}\\b.*`,
+                    case_insensitive: true,
+                  },
+                },
+              },
+              {
+                match: {
+                  content: {
+                    query,
+                    operator: "and",
+                    fuzziness: "AUTO",
+                  },
+                },
+              },
+            ],
           },
         },
       ],
@@ -411,7 +433,7 @@ router.get("/adv-search", async (req, res) => {
       body: {
         query: contentQuery,
         highlight: {
-          fields: { content: { fragment_size: 150, number_of_fragments: 1 } },
+          fields: { content: { fragment_size: 200, number_of_fragments: 2 } },
           pre_tags: ["<mark>"],
           post_tags: ["</mark>"],
         },
@@ -424,10 +446,10 @@ router.get("/adv-search", async (req, res) => {
       hits.map(async (hit) => {
         const src = hit._source || {};
         const content = src.content || "";
-        const regex = new RegExp(query, "gi");
+        const regex = new RegExp(`\\b${query}\\b`, "gi");
         const occurrences = (content.match(regex) || []).length;
         const snippet =
-          hit.highlight?.content?.[0] ||
+          hit.highlight?.content?.join(" ... ") ||
           content
             .split(". ")
             .find((line) =>
@@ -442,7 +464,7 @@ router.get("/adv-search", async (req, res) => {
             Bucket: process.env.S3_BUCKET_NAME,
             Key: src.s3_key,
             ResponseContentDisposition: "inline",
-            ResponseContentType: "application/pdf"
+            ResponseContentType: "application/pdf",
           });
           file_url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
         }
@@ -463,7 +485,10 @@ router.get("/adv-search", async (req, res) => {
       message: "Search fetched successfully",
       page: pageNum,
       limit: limitNum,
-      total: result.body.hits.total.value,
+      total:
+        typeof result.body.hits.total === "number"
+          ? result.body.hits.total
+          : result.body.hits.total?.value || 0,
       results,
     });
   } catch (error) {
