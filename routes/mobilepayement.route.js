@@ -164,7 +164,8 @@ router.post("/status", async (req, res) => {
     const statusResponse = await checkStatus(authToken, merchantTransactionId);
     const { state } = statusResponse.data;
     console.log(statusResponse.data);
-
+    
+    const now = new Date();
     const txn = await Transaction.findById(merchantTransactionId);
     if (state === "COMPLETED") {
       txn.status = "success";
