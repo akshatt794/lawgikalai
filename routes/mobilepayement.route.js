@@ -144,6 +144,7 @@ router.post("/init", async (req, res) => {
     );
     res.send({
       success: true,
+      merchantTransactionId,
       data: orderResponse.data,
     });
   } catch (error) {
