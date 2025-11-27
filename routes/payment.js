@@ -34,6 +34,8 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
     const { planName, amount, duration } = req.body;
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
+    // generate merchantTransactionId (use randomUUID or any stable generator)
+    const merchantTransactionId = `MT-${randomUUID()}`;
 
     // Create new transaction
     const transaction = new Transaction({
@@ -41,6 +43,7 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
       planName,
       amount,
       duration,
+      merchantTransactionId,
       status: "pending",
     });
     await transaction.save();
@@ -51,7 +54,7 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
       .build();
 
     const payRequest = StandardCheckoutPayRequest.builder()
-      .merchantOrderId(transaction._id.toString())
+      .merchantOrderId(merchantTransactionId)
       .amount(amount * 100)
       .redirectUrl(`${FRONTEND_URL}/payment-status?txnId=${transaction._id}`)
       .metaInfo(metaInfo)
@@ -89,71 +92,98 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
 });
 
 // ✅ VERIFY PAYMENT (SDK-BASED with getOrderStatus)
+// helper: addMonths preserving day or falling back to month-end
+function addMonthsSafe(date, months) {
+  const d = new Date(date.getTime());
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+
+  // If adding months overflowed (e.g., Jan 31 + 1 -> Mar 3), fix to last day of target month
+  if (d.getDate() < day) {
+    // move to last day of previous month (which is target month)
+    d.setDate(0); // sets to last day of previous month
+  }
+  return d;
+}
+
+// parse duration robustly, return integer number of months
+function parseDurationInMonths(durationStr) {
+  if (!durationStr) return 1;
+  const s = String(durationStr).toLowerCase().trim();
+
+  // quick numeric extraction e.g. "3", "3 months", "12"
+  const numMatch = s.match(/(\d{1,2})/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    // If user passed '1 year' treat as 12 months
+    if (s.includes("year") && n === 1) return 12;
+    return n;
+  }
+
+  // fallback checks
+  if (s.includes("1 month")) return 1;
+  if (s.includes("3 months")) return 3;
+  if (s.includes("6 months") ) return 6;
+  if (s.includes("12 months") || s.includes("1 year") ) return 12;
+
+  return 1; // default
+}
+
 router.post("/verify", async (req, res) => {
   try {
     const { txnId } = req.query;
-    if (!txnId) {
+    if (!txnId)
       return res.status(400).json({ error: "Transaction ID required" });
-    }
 
     const txn = await Transaction.findById(txnId);
-    if (!txn) {
-      return res.status(404).json({ error: "Transaction not found" });
+    if (!txn) return res.status(404).json({ error: "Transaction not found" });
+
+    // idempotency: if already processed successfully, return current plan
+    if (txn.status === "success") {
+      const userAlready = await User.findById(txn.userId).lean();
+      return res.json({
+        success: true,
+        message: "Transaction already processed.",
+        plan: userAlready?.plan || null,
+      });
     }
 
-    // Use correct merchant transaction ID
     const merchantTxnId = txn.merchantTransactionId || txn._id.toString();
 
+    // get order status from PhonePe
     const response = await phonePeClient.getOrderStatus(merchantTxnId);
     const state = response?.state;
+
+    // debug log (remove or lower verbosity in production)
+    console.log(
+      "[verify] txnId:",
+      txnId,
+      "merchantTxnId:",
+      merchantTxnId,
+      "state:",
+      state
+    );
 
     const now = new Date();
 
     if (state === "COMPLETED") {
-      // Update transaction
+      // mark txn success (idempotent)
       txn.status = "success";
+      txn.completedAt = new Date();
       await txn.save();
 
-      // Fetch user
+      // fetch user and compute start/end
       const user = await User.findById(txn.userId);
 
-      // Calculate new plan start date
       const previousEnd = user.plan?.endDate
         ? new Date(user.plan.endDate)
         : null;
-
-      // If user has active plan → new plan starts from previous end
       const start = previousEnd && previousEnd > now ? previousEnd : now;
 
-      // Create end date
-      const end = new Date(start.getTime());
+      // compute months to add from txn.duration
+      const months = parseDurationInMonths(txn.duration);
 
-      // Duration is stored inside transaction
-      const duration = txn.duration?.toLowerCase() || "";
-
-      if (duration.includes("1 month") || duration.includes("1 Month")) {
-        end.setMonth(end.getMonth() + 1);
-      } else if (
-        duration.includes("3 months") ||
-        duration.includes("3 Months")
-      ) {
-        end.setMonth(end.getMonth() + 3);
-      } else if (
-        duration.includes("6 months") ||
-        duration.includes("6 Months")
-      ) {
-        end.setMonth(end.getMonth() + 6);
-      } else if (
-        duration.includes("12 months") ||
-        duration.includes("1 year") ||
-        duration.includes("12 Months") ||
-        duration.includes("1 Year")
-      ) {
-        end.setFullYear(end.getFullYear() + 1);
-      } else {
-        console.warn("Unknown plan duration:", duration);
-        end.setMonth(end.getMonth() + 1); // Fallback: 1 month
-      }
+      const end = addMonthsSafe(start, months);
 
       // Update user plan
       user.plan = {
@@ -162,11 +192,16 @@ router.post("/verify", async (req, res) => {
         startDate: start,
         endDate: end,
       };
-
-      // Reset trial
       user.trial = { started: false, startDate: null, endDate: null };
 
       await user.save();
+
+      console.log("[verify] plan applied:", {
+        userId: user._id.toString(),
+        start: user.plan.startDate,
+        end: user.plan.endDate,
+        monthsApplied: months,
+      });
 
       return res.json({
         success: true,
@@ -175,17 +210,13 @@ router.post("/verify", async (req, res) => {
       });
     }
 
-    // ---- PENDING CASE ----
     if (state === "PENDING") {
       txn.status = "pending";
       await txn.save();
-      return res.json({
-        success: false,
-        message: "Payment is still pending.",
-      });
+      return res.json({ success: false, message: "Payment is still pending." });
     }
 
-    // ---- FAILED CASE ----
+    // failed/cancelled
     txn.status = "failed";
     await txn.save();
     return res.json({
@@ -193,7 +224,10 @@ router.post("/verify", async (req, res) => {
       message: "Payment failed or cancelled.",
     });
   } catch (err) {
-    console.error("Verification error:", err.response?.data || err.message);
+    console.error(
+      "Verification error:",
+      err.response?.data || err.message || err
+    );
     return res.status(500).json({ error: "Payment verification failed" });
   }
 });

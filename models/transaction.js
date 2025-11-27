@@ -20,6 +20,7 @@ const transactionSchema = new mongoose.Schema({
   },
   transactionId: String, // from PhonePe
   phonePeOrderId: String,
+  merchantTransactionId: String,
   createdAt: { type: Date, default: Date.now },
 });
 
