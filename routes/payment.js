@@ -91,90 +91,109 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
 router.post("/verify", async (req, res) => {
   try {
     const { txnId } = req.query;
-    if (!txnId)
+    if (!txnId) {
       return res.status(400).json({ error: "Transaction ID required" });
+    }
 
     const txn = await Transaction.findById(txnId);
-    if (!txn) return res.status(404).json({ error: "Transaction not found" });
+    if (!txn) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
 
-    // ✅ Use the merchant transaction ID (PhonePe’s)
-    const orderId =
-      txn.merchantTransactionId || txn.txnId || txn._id.toString();
+    // Use correct merchant transaction ID
+    const merchantTxnId = txn.merchantTransactionId || txn._id.toString();
 
-    const response = await phonePeClient.getOrderStatus(txn._id.toString());
+    const response = await phonePeClient.getOrderStatus(merchantTxnId);
     const state = response?.state;
+
     const now = new Date();
 
     if (state === "COMPLETED") {
+      // Update transaction
       txn.status = "success";
       await txn.save();
 
+      // Fetch user
       const user = await User.findById(txn.userId);
+
+      // Calculate new plan start date
       const previousEnd = user.plan?.endDate
         ? new Date(user.plan.endDate)
         : null;
-      const start = previousEnd && previousEnd > now ? previousEnd : now; // ✅ unique payment timestamp
-      const end = new Date(start.getTime()); // ✅ clone exact time
 
-      const planName = txn.planName.toLowerCase();
-      if (planName.includes("1 month") || planName.includes("1 Month")) {
+      // If user has active plan → new plan starts from previous end
+      const start = previousEnd && previousEnd > now ? previousEnd : now;
+
+      // Create end date
+      const end = new Date(start.getTime());
+
+      // Duration is stored inside transaction
+      const duration = txn.duration?.toLowerCase() || "";
+
+      if (duration.includes("1 month") || duration.includes("1 Month")) {
         end.setMonth(end.getMonth() + 1);
       } else if (
-        planName.includes("3 months") ||
-        planName.includes("3 Months")
+        duration.includes("3 months") ||
+        duration.includes("3 Months")
       ) {
         end.setMonth(end.getMonth() + 3);
       } else if (
-        planName.includes("6 months") ||
-        planName.includes("6 Months")
+        duration.includes("6 months") ||
+        duration.includes("6 Months")
       ) {
         end.setMonth(end.getMonth() + 6);
       } else if (
-        planName.includes("12 months") ||
-        planName.includes("1 year") ||
-        planName.includes("12 Months")
+        duration.includes("12 months") ||
+        duration.includes("1 year") ||
+        duration.includes("12 Months") ||
+        duration.includes("1 Year")
       ) {
         end.setFullYear(end.getFullYear() + 1);
       } else {
-        console.warn("⚠️ Unknown plan duration:", planName);
-        end.setMonth(end.getMonth() + 1); // fallback to 1 month
+        console.warn("Unknown plan duration:", duration);
+        end.setMonth(end.getMonth() + 1); // Fallback: 1 month
       }
 
+      // Update user plan
       user.plan = {
         name: txn.planName,
+        duration: txn.duration,
         startDate: start,
         endDate: end,
       };
+
+      // Reset trial
       user.trial = { started: false, startDate: null, endDate: null };
 
       await user.save();
 
-      // Confirm database update
-      const updated = await User.findById(txn.userId).lean();
-      console.log("✅ Updated user plan in DB:", updated.plan);
-
       return res.json({
         success: true,
         message: "Payment successful and plan activated.",
+        plan: user.plan,
       });
-    } else if (state === "PENDING") {
+    }
+
+    // ---- PENDING CASE ----
+    if (state === "PENDING") {
       txn.status = "pending";
       await txn.save();
       return res.json({
         success: false,
         message: "Payment is still pending.",
       });
-    } else {
-      txn.status = "failed";
-      await txn.save();
-      return res.json({
-        success: false,
-        message: "Payment failed or cancelled.",
-      });
     }
+
+    // ---- FAILED CASE ----
+    txn.status = "failed";
+    await txn.save();
+    return res.json({
+      success: false,
+      message: "Payment failed or cancelled.",
+    });
   } catch (err) {
     console.error("Verification error:", err.response?.data || err.message);
-    res.status(500).json({ error: "Payment verification failed" });
+    return res.status(500).json({ error: "Payment verification failed" });
   }
 });
 
