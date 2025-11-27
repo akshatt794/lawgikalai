@@ -9,7 +9,7 @@ const {
 const User = require("../models/User");
 const Transaction = require("../models/transaction");
 const { lightVerifyToken } = require("../middleware/lightVerifyToken");
-const crypto = require('node:crypto');
+const crypto = require("node:crypto");
 const { default: axios } = require("axios");
 
 const router = express.Router();
@@ -181,11 +181,23 @@ router.post("/verify", async (req, res) => {
 // ✅ FETCH TRANSACTION HISTORY
 router.get("/history", lightVerifyToken, async (req, res) => {
   try {
-    const transactions = await Transaction.find({ userId: req.user.userId })
+    const userId = req.user.userId;
+
+    // Fetch only successful transactions
+    const transactions = await Transaction.find({
+      userId,
+      status: "success",
+    })
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json({ transactions });
+    // Fetch user's plan details
+    const user = await User.findById(userId).lean();
+
+    res.json({
+      transactions,
+      plan: user.plan || null, // return user's subscription info
+    });
   } catch (err) {
     console.error("Transaction history error:", err);
     res.status(500).json({ error: "Failed to fetch transaction history" });
