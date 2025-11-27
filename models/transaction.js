@@ -13,6 +13,7 @@ const transactionSchema = new mongoose.Schema({
     enum: ["pending", "success", "failed"],
     default: "pending",
   },
+  duration: String,
   paymentGateway: {
     type: String,
     default: "PhonePe",
