@@ -31,7 +31,7 @@ const phonePeClient = StandardCheckoutClient.getInstance(
 // ✅ INITIATE PAYMENT
 router.post("/initiate", lightVerifyToken, async (req, res) => {
   try {
-    const { planName, amount } = req.body;
+    const { planName, amount, duration } = req.body;
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -40,6 +40,7 @@ router.post("/initiate", lightVerifyToken, async (req, res) => {
       userId: user._id,
       planName,
       amount,
+      duration,
       status: "pending",
     });
     await transaction.save();
