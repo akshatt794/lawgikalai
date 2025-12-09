@@ -19,8 +19,20 @@ const lightVerifyToken = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
+    // ❗ IMPORTANT: Validate token is still an active device session
+    const isActive = user.activeSessions.some(
+      (session) => session.token === token
+    );
+
+    if (!isActive) {
+      return res.status(401).json({
+        error: "SESSION_EXPIRED",
+        message: "This device has been logged out from your account.",
+      });
+    }
 
     req.user = decoded;
+    req.token = token;
     next();
   } catch (err) {
     console.error("Light token verification error:", err.message);
