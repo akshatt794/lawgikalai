@@ -856,17 +856,28 @@ router.post("/start-trial", lightVerifyToken, async (req, res) => {
 });
 
 // ✅ Logout from specific session (by token)
-router.post("/logout-session", lightVerifyToken, async (req, res) => {
+router.post("/logout-session", async (req, res) => {
   try {
-    const { tokenToRemove } = req.body;
+    const { tokenToRemove, mobileNumber, identifier } = req.body;
 
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!tokenToRemove) {
+      return res.status(400).json({ error: "tokenToRemove is required" });
+    }
 
-    const before = user.activeSessions.length;
+    // Find user by searching who has this session token
+    const user = await User.findOne({
+      activeSessions: { $elemMatch: { token: tokenToRemove } },
+    });
 
+    if (!user) {
+      return res.status(404).json({
+        error: "Session not found or already removed",
+      });
+    }
+
+    // Remove that session
     user.activeSessions = user.activeSessions.filter(
-      (session) => session.token !== tokenToRemove
+      (s) => s.token !== tokenToRemove
     );
 
     await user.save();
@@ -874,12 +885,12 @@ router.post("/logout-session", lightVerifyToken, async (req, res) => {
     res.json({
       message: "Session removed successfully.",
       remainingSessions: user.activeSessions,
-      removed: before !== user.activeSessions.length,
     });
   } catch (err) {
-    res
-      .status(500)
-      .json({ error: "Failed to remove session", details: err.message });
+    res.status(500).json({
+      error: "Failed to remove session",
+      details: err.message,
+    });
   }
 });
 
