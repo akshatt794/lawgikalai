@@ -66,11 +66,16 @@ router.post("/login", async (req, res) => {
     // ✅ Save cleanup result
     await user.save();
 
-    // ✅ Enforce 2-device limit
+    // If already logged in on 2 devices → return session info
     if (user.activeSessions.length >= 2) {
       return res.status(403).json({
-        error:
-          "You are already logged in on 2 devices. Please log out from one before logging in again.",
+        error: "DEVICE_LIMIT_REACHED",
+        message: "You are logged in on 2 devices already.",
+        activeSessions: user.activeSessions.map((s) => ({
+          device: s.device,
+          createdAt: s.createdAt,
+          token: s.token,
+        })),
       });
     }
 
@@ -793,6 +798,34 @@ router.post("/start-trial", lightVerifyToken, async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to start trial", details: err.message });
+  }
+});
+
+// ✅ Logout from specific session (by token)
+router.post("/logout-session", lightVerifyToken, async (req, res) => {
+  try {
+    const { tokenToRemove } = req.body;
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const before = user.activeSessions.length;
+
+    user.activeSessions = user.activeSessions.filter(
+      (session) => session.token !== tokenToRemove
+    );
+
+    await user.save();
+
+    res.json({
+      message: "Session removed successfully.",
+      remainingSessions: user.activeSessions,
+      removed: before !== user.activeSessions.length,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Failed to remove session", details: err.message });
   }
 });
 
