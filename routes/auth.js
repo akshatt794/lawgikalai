@@ -371,7 +371,7 @@ router.put("/change-password", verifyToken, async (req, res) => {
 // VERIFY OTP
 router.post("/verify-otp", async (req, res) => {
   try {
-    const { user_id, otp } = req.body;
+    const { user_id, otp, deviceInfo } = req.body;
     console.log(req.body);
     if (!user_id || !otp) {
       return res.status(400).json({ error: "User ID and OTP are required" });
@@ -398,7 +398,41 @@ router.post("/verify-otp", async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+    // Clean expired sessions
+    user.activeSessions = (user.activeSessions || []).filter((session) => {
+      try {
+        jwt.verify(session.token, JWT_SECRET);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    // Enforce 2-device limit
+    if (user.activeSessions.length >= 2) {
+      return res.status(403).json({
+        error: "DEVICE_LIMIT_REACHED",
+        message: "You are logged in on 2 devices already.",
+        activeSessions: user.activeSessions.map((s) => ({
+          device: s.device,
+          createdAt: s.createdAt,
+          token: s.token,
+        })),
+      });
+    }
+
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    // Add new active session
+    user.activeSessions.push({
+      token,
+      device: deviceInfo || req.headers["user-agent"] || "Unknown Device",
+      createdAt: new Date(),
+    });
+
+    await user.save();
 
     res.json({
       message: "OTP verified successfully.",
@@ -408,6 +442,13 @@ router.post("/verify-otp", async (req, res) => {
         name: user.fullName,
         email: user.identifier,
         mobileNumber: user.mobileNumber,
+        barCouncilId: user.barCouncilId,
+        qualification: user.qualification,
+        experience: user.experience,
+        practiceArea: user.practiceArea,
+        role: user.role,
+        plan: user.plan || null,
+        trial: user.trial || null,
       },
     });
   } catch (err) {
@@ -689,10 +730,16 @@ router.post("/login-phone", async (req, res) => {
     });
 
     // 🚫 Enforce max 2 devices per user
+    // If already logged in on 2 devices → return session info
     if (user.activeSessions.length >= 2) {
       return res.status(403).json({
-        error:
-          "You are already logged in on 2 devices. Please log out from one before logging in again.",
+        error: "DEVICE_LIMIT_REACHED",
+        message: "You are logged in on 2 devices already.",
+        activeSessions: user.activeSessions.map((s) => ({
+          device: s.device,
+          createdAt: s.createdAt,
+          token: s.token,
+        })),
       });
     }
 
@@ -721,6 +768,13 @@ router.post("/login-phone", async (req, res) => {
         name: user.fullName,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        role: user.role,
+        plan: user.plan || null,
+        trial: user.trial || null,
+        qualification: user.qualification,
+        experience: user.experience,
+        practiceArea: user.practiceArea,
+        barCouncilId: user.barCouncilId,
       },
     });
   } catch (err) {
