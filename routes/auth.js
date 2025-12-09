@@ -16,7 +16,7 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   // For cross-site frontends (different domain/port), 'none' is required & must be secure
   sameSite: "none",
-  secure: false, // requires HTTPS in prod
+  secure: true, // requires HTTPS in prod
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: "/",
 };
@@ -95,6 +95,13 @@ router.post("/login", async (req, res) => {
         name: user.fullName,
         email: user.identifier,
         mobileNumber: user.mobileNumber,
+        barCouncilId: user.barCouncilId,
+        qualification: user.qualification,
+        experience: user.experience,
+        practiceArea: user.practiceArea,
+        role: user.role,
+        plan: user.plan || null,
+        trial: user.trial || null,
       },
     });
   } catch (err) {

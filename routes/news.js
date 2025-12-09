@@ -84,10 +84,6 @@ router.get("/", async (req, res) => {
     res.status(500).json({ ok: false, error: "Server error" });
   }
 });
-
-// ----------------------
-// 3️⃣ Get Single News Details
-// ----------------------
 // ----------------------
 // 3️⃣ Get Single News Details (via body)
 // ----------------------
