@@ -2,29 +2,29 @@
 const mongoose = require("mongoose");
 
 const documentSchema = new mongoose.Schema(
-    {
-        title: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        category: {
-            type: String,
-            required: true,
-            enum: ["BareAct", "CriminalLaw", "Event", "Forms"],
-        },
-        file_name: {
-            type: String,
-            required: true,
-        },
-        file_url: {
-            type: String,
-            required: true,
-        },
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
     },
-    {
-        timestamps: true,
-    }
+    category: {
+      type: String,
+      required: true,
+      enum: ["BareAct", "CriminalLaw", "Event", "Forms", "Calendar"],
+    },
+    file_name: {
+      type: String,
+      required: true,
+    },
+    file_url: {
+      type: String,
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
 );
 
 module.exports = mongoose.model("GeneralDocument", documentSchema);

@@ -62,7 +62,13 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
     }
 
     // Validate category
-    const validCategories = ["BareAct", "CriminalLaw", "Event", "Forms"];
+    const validCategories = [
+      "BareAct",
+      "CriminalLaw",
+      "Event",
+      "Forms",
+      "Calendar",
+    ];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: "Invalid category" });
     }
@@ -110,7 +116,7 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
 });
 
 // 📥 GET DOCUMENTS
-// 0 = Criminal Law, 1 = Bare Acts, 2 = Events 3 = Forms
+// 0 = Criminal Law, 1 = Bare Acts, 2 = Events, 3 = Forms, 4 = Calendar
 router.get("/", async (req, res) => {
   try {
     const { type } = req.query; // 👈 from query params, e.g., ?type=0
@@ -121,11 +127,12 @@ router.get("/", async (req, res) => {
     else if (type === "1") category = "BareAct";
     else if (type === "2") category = "Event";
     else if (type === "3") category = "Forms";
+    else if (type === "4") category = "Calendar";
     else {
       return res.status(400).json({
         status: false,
         message:
-          "Invalid or missing 'type' query. Use ?type=0 (CriminalLaw), ?type=1 (BareAct), ?type=2 (Event), ?type=3 (Forms).",
+          "Invalid or missing 'type' query. Use ?type=0 (CriminalLaw), ?type=1 (BareAct), ?type=2 (Event), ?type=3 (Forms), ?type=4 (Calendar).",
       });
     }
 
@@ -155,6 +162,7 @@ router.get("/", async (req, res) => {
       CriminalLaw: "Criminal Law Resources",
       Event: "Legal Events and Conferences",
       Forms: "Legal Forms",
+      Calendar: "Calendar",
     };
 
     // 🔹 Response
@@ -243,6 +251,7 @@ router.get("/all", async (req, res) => {
       1: "BareAct",
       2: "Event",
       3: "Forms",
+      4: "Calendar",
     };
     const category = typeMap[type] || "CriminalLaw";
 
