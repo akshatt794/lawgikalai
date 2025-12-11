@@ -5,6 +5,8 @@ const { verifyToken } = require("../middleware/verifyToken");
 const jwt = require("jsonwebtoken"); // required for legacy fallback
 const mongoose = require("mongoose");
 const { lightVerifyToken } = require("../middleware/lightVerifyToken");
+const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const {
   createEventForCase,
   upsertEventForCase,
@@ -18,6 +20,14 @@ function generateCaseId() {
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `CASE-${yyyymmdd}-${random}`;
 }
+
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
 
 // ✅ Add Case API (Protected)
 router.post("/add", lightVerifyToken, async (req, res) => {
@@ -286,6 +296,24 @@ router.delete("/", lightVerifyToken, async (req, res) => {
       error: "Failed to delete case",
       details: err.message,
     });
+  }
+});
+
+router.get("/document-url", async (req, res) => {
+  try {
+    const { key } = req.query;
+    if (!key) return res.status(400).json({ error: "Missing key parameter" });
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
+    res.json({ url });
+  } catch (err) {
+    console.error("Presigned Error:", err);
+    res.status(500).json({ error: "Failed to generate presigned URL" });
   }
 });
 module.exports = router;
