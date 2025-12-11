@@ -147,6 +147,7 @@ router.post("/upload-pdf", upload.single("document"), async (req, res) => {
     const doc = new PdfDocument({
       title: req.file.originalname,
       file_url: fileUrl,
+      file_key: key,
       content: parsed.text,
     });
     await doc.save();
@@ -159,6 +160,7 @@ router.post("/upload-pdf", upload.single("document"), async (req, res) => {
         title: doc.title,
         file_name: req.file.originalname,
         file_url: fileUrl,
+        file_key: key,
         content: parsed.text,
         createdAt: doc.createdAt,
         uploaded_by: req.user?.id || "anonymous",
@@ -174,6 +176,7 @@ router.post("/upload-pdf", upload.single("document"), async (req, res) => {
         title: doc.title,
         file_url: doc.file_url,
         uploaded_at: doc.uploaded_at,
+        file_key: key,
       },
     });
   } catch (err) {
