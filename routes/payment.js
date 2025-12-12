@@ -192,7 +192,6 @@ router.post("/verify", async (req, res) => {
         startDate: start,
         endDate: end,
       };
-      user.trial = { started: false, startDate: null, endDate: null };
 
       await user.save();
 

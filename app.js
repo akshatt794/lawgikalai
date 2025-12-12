@@ -39,7 +39,7 @@ const judgesListRoutes = require("./routes/judgesList");
 const exploreFormRoutes = require("./routes/explore");
 const paymentRoutes = require("./routes/payment");
 const googleAuthRoutes = require("./routes/googleAuth");
-const mobilePaymentRoutes = require("./routes/mobilepayement.route");
+const mobilePaymentRoutes = require("./routes/mobile-payment");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
