@@ -80,24 +80,29 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
 
     const payRequest = StandardCheckoutPayRequest.builder()
       .merchantOrderId(merchantTransactionId)
-      .amount(amount * 100) // paise
+      .amount(amount * 100) // in paise
       .metaInfo(metaInfo)
-      .redirectUrl(`lawgikalai://payment/payment-redirect?txnId=${txn._id}`)
       .build();
 
-    const response = await phonePeClient.pay(payRequest);
-    const paymentUrl = response?.redirectUrl;
+    // IMPORTANT: Generate SDK token (NOT redirect URL)
+    const response = await phonePeClient.createOrder(payRequest);
 
-    if (!paymentUrl) {
-      return res
-        .status(500)
-        .json({ error: "Failed to create payment session" });
+    const token =
+      response?.data?.instrumentResponse?.redirectInfo?.token ||
+      response?.data?.instrumentResponse?.token;
+
+    if (!token) {
+      return res.status(500).json({
+        error: "Failed to create PhonePe token",
+        details: response,
+      });
     }
 
     res.json({
+      success: true,
       txnId: txn._id,
-      merchantTxnId: merchantTransactionId,
-      paymentUrl,
+      orderId: merchantTransactionId,
+      token,
     });
   } catch (err) {
     console.error("Mobile Payment Init Error:", err.response?.data || err);
