@@ -4,9 +4,8 @@ const {
   StandardCheckoutClient,
   Env,
   MetaInfo,
-  StandardCheckoutPayRequest,
+  CreateSdkOrderRequest,
 } = require("pg-sdk-node");
-
 const User = require("../models/User");
 const Transaction = require("../models/transaction");
 const { lightVerifyToken } = require("../middleware/lightVerifyToken");
@@ -58,42 +57,46 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
     const { planName, amount, duration } = req.body;
 
     const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
-    const merchantTransactionId = `MT-${randomUUID()}`;
+    const merchantOrderId = `MT-${randomUUID()}`;
+    const amountInPaise = amount * 100;
 
-    // Create transaction entry
-    const txn = new Transaction({
+    // Save transaction in DB (PENDING)
+    const txn = await Transaction.create({
       userId: user._id,
       planName,
       amount,
       duration,
-      merchantTransactionId,
+      merchantTransactionId: merchantOrderId,
       status: "pending",
     });
-    await txn.save();
+
+    const redirectUrl = `lawgikalai://payment/status?txnId=${txn._id}`; // deep link
 
     const metaInfo = MetaInfo.builder()
       .udf1(user._id.toString())
       .udf2(planName)
       .build();
 
-    const payRequest = StandardCheckoutPayRequest.builder()
-      .merchantOrderId(merchantTransactionId)
-      .amount(amount * 100) // in paise
+    // ⭐ Correct PhonePe SDK Order Request Builder
+    const request = CreateSdkOrderRequest.StandardCheckoutBuilder()
+      .merchantOrderId(merchantOrderId)
+      .amount(amountInPaise)
+      .redirectUrl(redirectUrl)
       .metaInfo(metaInfo)
       .build();
 
-    // IMPORTANT: Generate SDK token (NOT redirect URL)
-    const response = await phonePeClient.createOrder(payRequest);
+    // ⭐ Correct function to call (NOT createOrder)
+    const response = await phonePeClient.createSdkOrder(request);
 
-    const token =
-      response?.data?.instrumentResponse?.redirectInfo?.token ||
-      response?.data?.instrumentResponse?.token;
-
-    if (!token) {
+    if (!response?.token) {
       return res.status(500).json({
-        error: "Failed to create PhonePe token",
+        success: false,
+        error: "Failed to create PhonePe SDK order",
         details: response,
       });
     }
@@ -101,12 +104,16 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
     res.json({
       success: true,
       txnId: txn._id,
-      orderId: merchantTransactionId,
-      token,
+      orderId: merchantOrderId,
+      token: response.token, // Use this token in RN SDK
+      redirectUrl,
     });
-  } catch (err) {
-    console.error("Mobile Payment Init Error:", err.response?.data || err);
-    res.status(500).json({ error: "Failed to initiate payment" });
+  } catch (error) {
+    console.error("Mobile createSdkOrder error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to initiate mobile PhonePe order",
+    });
   }
 });
 
