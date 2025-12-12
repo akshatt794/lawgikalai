@@ -82,7 +82,7 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
       .merchantOrderId(merchantTransactionId)
       .amount(amount * 100) // paise
       .metaInfo(metaInfo)
-      .redirectUrl(`lawgikalai://payment?txnId=${txn._id}`)
+      .redirectUrl(`lawgikalai://payment/payment-redirect?txnId=${txn._id}`)
       .build();
 
     const response = await phonePeClient.pay(payRequest);
