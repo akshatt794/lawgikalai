@@ -248,9 +248,11 @@ router.post("/forgot-password", async (req, res) => {
     sendCodeByEmail(user.identifier, otp);
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET);
-
-    console.log(`Forgot-password OTP for ${user.identifier}: ${otp}`);
+    const resetToken = jwt.sign(
+      { userId: user._id, type: "RESET_PASSWORD" },
+      JWT_SECRET,
+      { expiresIn: "20m" }
+    );
 
     return res.json({
       message: `OTP sent to ${
@@ -258,12 +260,52 @@ router.post("/forgot-password", async (req, res) => {
       } for password reset.`,
       user_id: user._id,
       requires_verification: !user.isVerified, // true if user not verified
-      token,
+      resetToken,
     });
   } catch (err) {
     console.error("Forgot password error:", err);
     res.status(500).json({ error: "Server error", details: err.message });
   }
+});
+
+router.post("/forgot-verify-otp", async (req, res) => {
+  const { userId, otp, resetToken } = req.body;
+
+  const decoded = jwt.verify(resetToken, JWT_SECRET);
+  if (decoded.type !== "RESET_PASSWORD")
+    return res.status(401).json({ error: "Invalid token" });
+
+  const user = await User.findById(userId);
+  if (!user || user.otp !== otp || user.otpExpires < Date.now())
+    return res.status(400).json({ error: "Invalid or expired OTP" });
+
+  user.otp = undefined;
+  user.otpExpires = undefined;
+  await user.save();
+
+  res.json({ verified: true, resetToken });
+});
+
+router.post("/forgot-reset-password", async (req, res) => {
+  const { newPassword, resetToken } = req.body;
+
+  const decoded = jwt.verify(resetToken, JWT_SECRET);
+  if (decoded.type !== "RESET_PASSWORD")
+    return res.status(401).json({ error: "Invalid token" });
+
+  const user = await User.findById(decoded.userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  user.password = await bcrypt.hash(newPassword, 10);
+
+  // OPTIONAL SECURITY: logout all devices
+  user.activeSessions = [];
+
+  await user.save();
+
+  res.json({
+    message: "Password reset successful. Please login again.",
+  });
 });
 
 // CONFIRM PASSWORD (RESET ONLY — NO LOGIN)
@@ -291,57 +333,6 @@ router.post("/confirm-password", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Server error", details: err.message });
   }
 });
-
-// router.post('/forgot-password', async (req, res) => {
-//   try {
-//     const { identifier } = req.body;
-
-//     if (!identifier) {
-//       return res.status(400).json({ error: 'Identifier is required' });
-//     }
-
-//     // Determine if identifier is email or mobile number
-//     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
-//     const isMobile = /^[0-9]{10}$/.test(identifier); // adjust if needed
-
-//     let query = {};
-//     if (isEmail) {
-//       query = { identifier }; // assuming identifier field stores email too
-//     } else if (isMobile) {
-//       query = { mobileNumber: identifier };
-//     } else {
-//       return res.status(400).json({ error: 'Invalid identifier format' });
-//     }
-
-//     let user = await User.findOne(query);
-
-//     if (!user) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     // Generate OTP
-//     const otp = generateOtp();
-//     user.otp = otp;
-//     user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-//     await user.save();
-//     sendCodeByEmail(user.email, otp);
-
-//     // Generate JWT token
-//     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
-
-//     console.log(`Forgot-password OTP for ${user.identifier}: ${otp}`);
-
-//     return res.json({
-//       message: `OTP sent to ${isEmail ? 'email' : 'mobile'} for password reset.`,
-//       user_id: user._id,
-//       requires_verification: !user.isVerified, // true if user not verified
-//       token
-//     });
-//   } catch (err) {
-//     console.error('Forgot password error:', err);
-//     res.status(500).json({ error: 'Server error', details: err.message });
-//   }
-// });
 
 // CHANGE PASSWORD
 router.put("/change-password", verifyToken, async (req, res) => {
