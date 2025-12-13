@@ -266,24 +266,29 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// confirm password
+// CONFIRM PASSWORD (RESET ONLY — NO LOGIN)
 router.post("/confirm-password", verifyToken, async (req, res) => {
   try {
-    const { newPassword, token } = req.body;
+    const { newPassword } = req.body;
+
+    if (!newPassword) {
+      return res.status(400).json({ error: "New password is required" });
+    }
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedNewPassword;
+    // 🔐 Update password
+    user.password = await bcrypt.hash(newPassword, 10);
+
     await user.save();
 
-    res.json({ message: "Password changed successfully", token });
+    res.json({
+      message: "Password reset successfully. Please log in again.",
+    });
   } catch (err) {
-    console.error("Change password error:", err);
-    res
-      .status(500)
-      .json({ error: "Server error", details: err.message, token });
+    console.error("Confirm password error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
