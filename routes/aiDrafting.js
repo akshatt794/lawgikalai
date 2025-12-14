@@ -111,6 +111,8 @@ router.post("/draft/mobile", lightVerifyToken, async (req, res) => {
     const result =
       completion.choices?.[0]?.message?.content || "No response generated.";
 
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+
     return res.json({
       success: true,
       message: result,
@@ -154,6 +156,5 @@ router.get("/usage", lightVerifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch usage info" });
   }
 });
-
 
 module.exports = router;
