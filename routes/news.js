@@ -47,7 +47,11 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     // ✅ Broadcast notification to all users
     await sendNotificationToAllUsers(
       `📰 Latest News: ${title}`,
-      content.slice(0, 80) + "..."
+      content.slice(0, 80) + "...",
+      {
+        type: "news",
+        entityId: news._id,
+      }
     );
 
     res.status(201).json({
