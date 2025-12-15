@@ -56,6 +56,7 @@ async function sendExpoNotifications(tokens, title, body) {
     sound: "default",
     title,
     body,
+    data,
   }));
 
   await axios.post("https://exp.host/--/api/v2/push/send", messages, {
@@ -64,7 +65,7 @@ async function sendExpoNotifications(tokens, title, body) {
 }
 
 // ✅ Helper: Send notification to all users
-async function sendNotificationToAllUsers(title, body) {
+async function sendNotificationToAllUsers(title, body, meta) {
   const users = await User.find({
     $or: [
       { "pushTokens.web.0": { $exists: true } },
@@ -75,19 +76,31 @@ async function sendNotificationToAllUsers(title, body) {
   const webTokens = users.flatMap((u) => u.pushTokens.web || []);
   const expoTokens = users.flatMap((u) => u.pushTokens.expo || []);
 
+  const dataPayload = {
+    type: meta.type,
+    entityId: meta.entityId.toString(),
+  };
+
   if (webTokens.length) {
     await admin.messaging().sendEachForMulticast({
       notification: { title, body },
       tokens: webTokens,
+      data: dataPayload,
     });
   }
 
   if (expoTokens.length) {
-    await sendExpoNotifications(expoTokens, title, body);
+    await sendExpoNotifications(expoTokens, title, body, dataPayload);
   }
 
   await Notification.insertMany(
-    users.map((u) => ({ userId: u._id, title, body }))
+    users.map((u) => ({
+      userId: u._id,
+      title,
+      body,
+      type: meta.type,
+      entityId: meta.entityId,
+    }))
   );
 }
 

@@ -67,7 +67,11 @@ router.post("/add", auth, async (req, res) => {
     // ✅ Broadcast notification to all users
     await sendNotificationToAllUsers(
       `New Announcement: ${title}`,
-      content.slice(0, 80) + "..." // short preview
+      content.slice(0, 80) + "...", // short preview
+      {
+        type: "announcement",
+        entityId: newAnnouncement._id,
+      }
     );
 
     res.json({
