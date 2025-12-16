@@ -43,6 +43,49 @@ router.get("/", async (req, res) => {
   }
 });
 
+/* ==========================================================
+   ✅ NEW: GET /api/announcements/all
+   Fetch all announcements (paginated)
+   ========================================================== */
+router.get("/all", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const total = await Announcement.countDocuments();
+    const announcements = await Announcement.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    if (!announcements.length) {
+      return res.json({
+        message: "No announcements found.",
+        count: 0,
+        currentPage: page,
+        totalPages: 0,
+        data: [],
+      });
+    }
+
+    res.json({
+      message: "✅ All announcements fetched successfully.",
+      count: total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      data: announcements,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching announcements:", err);
+    res.status(500).json({
+      error: "Failed to fetch announcements",
+      details: err.message,
+    });
+  }
+});
+
 // GET total count of announcements
 router.get("/count", async (req, res) => {
   try {
@@ -139,49 +182,6 @@ router.get("/:id", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Server error", details: err.message });
-  }
-});
-
-/* ==========================================================
-   ✅ NEW: GET /api/announcements/all
-   Fetch all announcements (paginated)
-   ========================================================== */
-router.get("/all", async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const total = await Announcement.countDocuments();
-    const announcements = await Announcement.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    if (!announcements.length) {
-      return res.json({
-        message: "No announcements found.",
-        count: 0,
-        currentPage: page,
-        totalPages: 0,
-        data: [],
-      });
-    }
-
-    res.json({
-      message: "✅ All announcements fetched successfully.",
-      count: total,
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      data: announcements,
-    });
-  } catch (err) {
-    console.error("❌ Error fetching announcements:", err);
-    res.status(500).json({
-      error: "Failed to fetch announcements",
-      details: err.message,
-    });
   }
 });
 
