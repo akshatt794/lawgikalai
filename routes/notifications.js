@@ -48,7 +48,7 @@ router.post("/save-token", lightVerifyToken, async (req, res) => {
   }
 });
 
-async function sendExpoNotifications(tokens, title, body) {
+async function sendExpoNotifications(tokens, title, body, dataPayload) {
   if (!tokens.length) return;
 
   const messages = tokens.map((token) => ({
@@ -56,7 +56,7 @@ async function sendExpoNotifications(tokens, title, body) {
     sound: "default",
     title,
     body,
-    data,
+    data: dataPayload,
   }));
 
   await axios.post("https://exp.host/--/api/v2/push/send", messages, {
