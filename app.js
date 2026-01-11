@@ -40,6 +40,7 @@ const exploreFormRoutes = require("./routes/explore");
 const paymentRoutes = require("./routes/payment");
 const googleAuthRoutes = require("./routes/googleAuth");
 const mobilePaymentRoutes = require("./routes/mobile-payment");
+const appleIapRoutes = require("./routes/iap");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
@@ -130,6 +131,7 @@ app.use("/api/test", testDocumentDbRoute);
 // Changed here the route handling
 app.use("/api/courts", causeListRoute);
 app.use("/api/general-document", generalDocumentRoutes);
+app.use("/iap", appleIapRoutes);
 
 // 🔌 NEW mounts
 app.use("/api/ddc", ddcRoutes); // UI structure + upload + search over PDFs
