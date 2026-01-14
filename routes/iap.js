@@ -18,10 +18,10 @@ router.post("/apple/verify", lightVerifyToken, async (req, res) => {
 
     // Map productId → plan
     const planMap = {
-      "lawgikalai.monthly": { months: 1 },
-      "lawgikalai.quarterly": { months: 3 },
-      "lawgikalai.halfyear": { months: 6 },
-      "lawgikalai.yearly": { months: 12 },
+      "lawgikalai.sub.monthly": 1,
+      "lawgikalai.sub.quarterly": 3,
+      "lawgikalai.sub.halfyear": 6,
+      "lawgikalai.sub.yearly": 12,
     };
 
     const planInfo = planMap[purchase.productId];
@@ -34,7 +34,7 @@ router.post("/apple/verify", lightVerifyToken, async (req, res) => {
 
     const start = previousEnd && previousEnd > now ? previousEnd : now;
     const end = new Date(start);
-    end.setMonth(end.getMonth() + planInfo.months);
+    end.setMonth(end.getMonth() + planInfo);
 
     user.plan = {
       name: purchase.productId,
@@ -62,10 +62,10 @@ router.post("/apple/restore", lightVerifyToken, async (req, res) => {
   const productId = latest.productId || latest.id;
 
   const planMap = {
-    "lawgikalai.monthly": 1,
-    "lawgikalai.quarterly": 3,
-    "lawgikalai.halfyear": 6,
-    "lawgikalai.yearly": 12,
+    "lawgikalai.sub.monthly": 1,
+    "lawgikalai.sub.quarterly": 3,
+    "lawgikalai.sub.halfyear": 6,
+    "lawgikalai.sub.yearly": 12,
   };
 
   const months = planMap[productId];
