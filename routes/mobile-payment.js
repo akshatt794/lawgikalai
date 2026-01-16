@@ -167,6 +167,7 @@ router.post("/mobile/verify", lightVerifyToken, async (req, res) => {
         duration: txn.duration,
         startDate,
         endDate,
+        source: "PHONEPE",
       };
 
       await user.save();

@@ -45,6 +45,22 @@ const userSchema = new mongoose.Schema({
     name: { type: String, default: null }, // e.g. "Advocate Starter Plan"
     startDate: { type: Date, default: null },
     endDate: { type: Date, default: null },
+
+    // Payment source
+    source: {
+      type: String,
+      enum: ["PHONEPE", "APPLE_IAP", "GOOGLE_PLAY", "WEB", "ADMIN"],
+      default: null,
+    },
+
+    // Apple IAP specific fields
+    transactionId: { type: String, default: null }, // Latest Apple transaction ID
+    originalTransactionId: { type: String, default: null }, // Original transaction ID (same across renewals)
+    isActive: { type: Boolean, default: true },
+    willAutoRenew: { type: Boolean, default: false },
+    isTrialPeriod: { type: Boolean, default: false },
+    lastVerified: { type: Date, default: null },
+    latestReceipt: { type: String, default: null },
   },
 
   // ✅ Trial
@@ -62,5 +78,9 @@ const userSchema = new mongoose.Schema({
     connected: { type: Boolean, default: false },
   },
 });
+
+// Index for Apple IAP webhook lookups
+userSchema.index({ "plan.originalTransactionId": 1 });
+userSchema.index({ "plan.source": 1 });
 
 module.exports = mongoose.model("User", userSchema);
