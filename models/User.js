@@ -49,7 +49,21 @@ const userSchema = new mongoose.Schema({
     // Payment source
     source: {
       type: String,
-      enum: ["PHONEPE", "APPLE_IAP", "GOOGLE_PLAY", "WEB", "ADMIN"],
+      enum: [
+        "PHONEPE",
+        "APPLE_IAP",
+        "GOOGLE_PLAY",
+        "REVENUECAT_IOS",
+        "WEB",
+        "ADMIN",
+      ],
+      default: null,
+    },
+
+    // ✅ Track platform explicitly
+    platform: {
+      type: String,
+      enum: ["ios", "android", "web", null],
       default: null,
     },
 
