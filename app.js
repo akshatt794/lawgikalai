@@ -41,6 +41,7 @@ const paymentRoutes = require("./routes/payment");
 const googleAuthRoutes = require("./routes/googleAuth");
 const mobilePaymentRoutes = require("./routes/mobile-payment");
 const appleIapRoutes = require("./routes/iap");
+const revenueCatRoutes = require("./routes/revenuecat-sync");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
@@ -108,7 +109,7 @@ app.use(
         res.setHeader("Content-Disposition", "inline");
       }
     },
-  })
+  }),
 );
 
 require("./jobs/notificationScheduler");
@@ -132,6 +133,7 @@ app.use("/api/test", testDocumentDbRoute);
 app.use("/api/courts", causeListRoute);
 app.use("/api/general-document", generalDocumentRoutes);
 app.use("/iap", appleIapRoutes);
+app.use("/api/revenuecat", revenueCatRoutes);
 
 // 🔌 NEW mounts
 app.use("/api/ddc", ddcRoutes); // UI structure + upload + search over PDFs
@@ -174,7 +176,7 @@ if (caPath && fs.existsSync(caPath)) {
   mongoOpts.tlsCAFile = caPath;
 } else {
   console.warn(
-    "⚠️  DOCDB_CA not found or not set. TLS is enabled without custom CA."
+    "⚠️  DOCDB_CA not found or not set. TLS is enabled without custom CA.",
   );
   if (caPath) console.warn("   Expected at:", caPath);
 }
