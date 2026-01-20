@@ -119,7 +119,7 @@ router.post("/login", async (req, res) => {
 router.post("/signup", async (req, res) => {
   try {
     const { fullName, identifier, password, mobileNumber } = req.body;
-    if (!fullName || !identifier || !password || !mobileNumber) {
+    if (!fullName || !identifier || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
@@ -127,8 +127,11 @@ router.post("/signup", async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
 
     // 1) Check by mobile number
-    let existingUser = await User.findOne({ mobileNumber });
-    if (existingUser) {
+    let existingUser = null;
+    if (mobileNumber) {
+      existingUser = await User.findOne({ mobileNumber });
+    }
+    if (existingUser && mobileNumber) {
       if (existingUser.isVerified) {
         return res
           .status(409)
@@ -171,7 +174,9 @@ router.post("/signup", async (req, res) => {
         existingUser.otpExpires = Date.now() + 10 * 60 * 1000;
         existingUser.password = hash; // update password if re-trying
         existingUser.fullName = fullName;
-        existingUser.mobileNumber = mobileNumber;
+        if (mobileNumber) {
+          existingUser.mobileNumber = mobileNumber;
+        }
         await existingUser.save();
         sendCodeByEmail(identifier, otp);
         // console.log(`Resent OTP for ${identifier}: ${otp}`);
@@ -190,7 +195,7 @@ router.post("/signup", async (req, res) => {
       fullName,
       identifier,
       password: hash,
-      mobileNumber,
+      ...(mobileNumber ? { mobileNumber } : {}),
     });
     console.log("Please help " + identifier);
     const otp = generateOtp();
@@ -251,7 +256,7 @@ router.post("/forgot-password", async (req, res) => {
     const resetToken = jwt.sign(
       { userId: user._id, type: "RESET_PASSWORD" },
       JWT_SECRET,
-      { expiresIn: "20m" }
+      { expiresIn: "20m" },
     );
 
     return res.json({
@@ -568,7 +573,7 @@ router.put("/profile", lightVerifyToken, async (req, res) => {
         "IncomeTax",
         "Arbitration",
         "Others",
-      ])
+      ]),
     );
 
     const resultPracticeAreas = {};
@@ -664,7 +669,7 @@ router.post("/logout", verifyToken, async (req, res) => {
 
     // 🧹 Remove only this token from active sessions
     user.activeSessions = user.activeSessions.filter(
-      (session) => session.token !== token
+      (session) => session.token !== token,
     );
 
     await user.save();
@@ -741,7 +746,7 @@ router.post("/login-phone", async (req, res) => {
 
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || "your_jwt_secret"
+      process.env.JWT_SECRET || "your_jwt_secret",
     );
 
     // 💾 Save session info
@@ -873,7 +878,7 @@ router.post("/logout-session", async (req, res) => {
 
     // Remove that session
     user.activeSessions = user.activeSessions.filter(
-      (s) => s.token !== tokenToRemove
+      (s) => s.token !== tokenToRemove,
     );
 
     await user.save();
