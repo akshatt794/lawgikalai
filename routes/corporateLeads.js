@@ -1,6 +1,9 @@
 const express = require("express");
 const CorporateLead = require("../models/CorporateLead");
-const { sendCorporateLeadEmail, sendCorporateLeadAutoReply } = require("../utils/leadEmailService");
+const {
+  sendCorporateLeadEmailToAdmin,
+  sendCorporateLeadAutoReply,
+} = require("../utils/leadEmailService");
 const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const router = express.Router();
@@ -31,10 +34,10 @@ router.post("/", async (req, res) => {
 
     // 📧 Notify admin
     try {
-      await sendCorporateLeadEmail(lead);
+      await sendCorporateLeadEmailToAdmin(lead);
       await sendCorporateLeadAutoReply(lead);
     } catch (mailErr) {
-      console.warn("⚠️ Lead email failed:", mailErr.message);
+      console.error("⚠️ Lead email failed:", mailErr.message);
     }
 
     return res.status(201).json({

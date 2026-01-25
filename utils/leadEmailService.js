@@ -2,7 +2,7 @@ const nodemailer = require("nodemailer");
 const { getCorporateLeadAutoReplyTemplate } = require("./leadEmailTemplates");
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  service: "gmail.com",
   auth: {
     user: process.env.ADMIN_EMAIL,
     pass: process.env.APP_PWD,
