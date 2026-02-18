@@ -46,19 +46,19 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
 
     // ✅ iOS product ID mapping
     const productMap = {
-      "lawgikalai.starter": {
+      "rc.monthly": {
         planName: "Advocate Starter Plan",
         duration: "1 Month",
       },
-      "lawgikalai.litigator": {
+      "rc.quarterly": {
         planName: "Professional Litigator Plan",
         duration: "3 Months",
       },
-      "lawgikalai.power": {
+      "rc.halfyearly": {
         planName: "Courtroom Power Plan",
         duration: "6 Months",
       },
-      "lawgikalai.premium": {
+      "rc.annually": {
         planName: "LawgikalAI Enterprise Premium",
         duration: "12 Months",
       },
