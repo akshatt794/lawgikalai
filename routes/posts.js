@@ -78,7 +78,7 @@ router.post(
 // ====================================
 //  GET FEED (Infinite Scroll)
 // ====================================
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { cursor } = req.query;
 
