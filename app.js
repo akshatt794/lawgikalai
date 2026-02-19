@@ -44,6 +44,7 @@ const appleIapRoutes = require("./routes/iap");
 const revenueCatRoutes = require("./routes/revenuecat-sync");
 const corporateLeadRoutes = require("./routes/corporateLeads");
 const iapSyncRoutes = require("./routes/iap-sync");
+const postsRoutes = require("./routes/posts");
 
 // 🚀 NEW: Delhi District Courts PDF API (complex → zone → category)
 const ddcRoutes = require("./routes/ddc"); // <-- add this
@@ -149,6 +150,7 @@ app.use("/api/google", googleAuthRoutes);
 app.use("/api/mobilepayment", mobilePaymentRoutes);
 app.use("/api/corporate-leads", corporateLeadRoutes);
 app.use("/api/iap", iapSyncRoutes);
+app.use("/api/posts", postsRoutes);
 
 // Health / base
 app.get("/", (_req, res) => {
