@@ -1,8 +1,8 @@
 const express = require("express");
 const Post = require("../models/Post");
+const multer = require("multer");
 const { verifyToken } = require("../middleware/verifyToken");
 const { uploadToS3, getPresignedUrl, s3 } = require("../utils/s3Client");
-const upload = require("../middleware/multer");
 const {
   createPostLimiter,
   commentLimiter,
@@ -11,6 +11,8 @@ const {
 const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage() }); // store in memory buffer
 
 // ------------------------------------
 // Helper: Delete image from S3
