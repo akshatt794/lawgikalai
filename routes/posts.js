@@ -122,6 +122,33 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/mine", lightVerifyToken, async (req, res) => {
+  try {
+    const posts = await Post.find({ author: req.user.userId })
+      .populate("author", "fullName practiceArea")
+      .populate("comments.user", "fullName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const postsWithImages = await Promise.all(
+      posts.map(async (p) => {
+        let images = [];
+        if (p.image_urls && p.image_urls.length > 0) {
+          images = await Promise.all(
+            p.image_urls.map((key) => getPresignedUrl(key)),
+          );
+        }
+        return { ...p, images };
+      }),
+    );
+
+    res.json({ ok: true, posts: postsWithImages });
+  } catch (err) {
+    console.error("❌ Fetch My Posts Error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ====================================
 //  GET LIKED POSTS
 // ====================================
