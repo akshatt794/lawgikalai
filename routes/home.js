@@ -83,7 +83,7 @@ async function toAwsCompatibleUrl(raw) {
         return await getSignedUrl(
           s3,
           new GetObjectCommand({ Bucket: BUCKET, Key: keyFromHttps }),
-          { expiresIn: 3600 }
+          { expiresIn: 3600 },
         );
       }
     }
@@ -100,7 +100,7 @@ async function toAwsCompatibleUrl(raw) {
         return await getSignedUrl(
           s3,
           new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-          { expiresIn: 3600 }
+          { expiresIn: 3600 },
         );
       }
       return `${S3_PUBLIC_BASE}/${key}`;
@@ -115,7 +115,7 @@ async function toAwsCompatibleUrl(raw) {
       return await getSignedUrl(
         s3,
         new GetObjectCommand({ Bucket: BUCKET, Key: bareKey }),
-        { expiresIn: 3600 }
+        { expiresIn: 3600 },
       );
     }
     if (S3_PUBLIC_BASE) return `${S3_PUBLIC_BASE}/${bareKey}`;
@@ -285,7 +285,7 @@ router.get("/", lightVerifyToken, async (req, res) => {
           createdAt: n.createdAt,
           image,
         };
-      })
+      }),
     );
 
     return res.json({
@@ -423,31 +423,57 @@ Once disconnected, all Google access tokens and associated data are deleted from
 ---
 
 ## 8. Third-Party Services
-We may use trusted third-party providers (e.g., cloud hosting, email delivery) to support operations.  
-These providers are contractually bound to maintain confidentiality and follow strict data security standards.
+We may use trusted third-party providers (e.g., cloud hosting, email delivery, and AI processing providers such as OpenAI) to support operations.
 
 ---
 
-## 9. Your Rights
+## 9. AI Processing (OpenAI Integration)
+
+LawgikalAI provides an AI Drafting feature powered by OpenAI, L.L.C.
+
+When you use the AI Drafting feature, the following data is transmitted to OpenAI for processing:
+
+- The prompt text that you voluntarily enter into the AI Drafting input field.
+
+We do NOT transmit:
+- Your account email address
+- Payment information
+- Device identifiers
+- IP address
+- Case database records
+- Any other account metadata
+
+The AI prompt is transmitted solely for the purpose of generating a response.
+
+LawgikalAI does not store AI prompts or AI-generated responses on its servers.
+
+OpenAI processes data in accordance with its Privacy Policy:
+https://openai.com/policies/privacy-policy
+
+OpenAI is contractually obligated to maintain industry-standard security and confidentiality protections.
+
+AI-generated responses are provided as a productivity tool and do not constitute legal advice.
+
+## 10. Your Rights
 You have the right to:
 - Access, correct, or delete your personal information stored with us.
 - Request account deletion or data export at any time, subject to legal obligations.
 
 ---
 
-## 10. Data Retention
+## 11. Data Retention
 We retain user and case data only as long as necessary to provide services or comply with legal requirements.  
 Deleted data is permanently removed from our systems within a reasonable timeframe.
 
 ---
 
-## 11. Changes to Privacy Policy
+## 12. Changes to Privacy Policy
 We may update this Privacy Policy periodically to reflect improvements or new legal requirements.  
 You will be notified of any significant changes via the app or our website. Continued use of LawgikalAI constitutes acceptance of the updated terms.
 
 ---
 
-## 12. Contact Us
+## 13. Contact Us
 If you have any questions, concerns, or privacy requests, please contact our Privacy Officer:
 
 **Email:** management@lawgikalai.com  

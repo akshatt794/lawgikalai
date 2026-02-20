@@ -8,9 +8,9 @@ const {
   commentLimiter,
   likeLimiter,
 } = require("../middleware/feedRateLimiter");
+const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const router = express.Router();
-// const upload = multer({ storage: multer.memoryStorage() });
 
 // ------------------------------------
 // Helper: Delete image from S3
@@ -90,6 +90,7 @@ router.get("/", async (req, res) => {
 
     const posts = await Post.find(query)
       .populate("author", "fullName practiceArea")
+      .populate("comments.user", "fullName") // ✅ populate comment authors
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
@@ -122,12 +123,13 @@ router.get("/", async (req, res) => {
 // ====================================
 //  GET LIKED POSTS
 // ====================================
-router.get("/liked/me", verifyToken, async (req, res) => {
+router.get("/liked/me", lightVerifyToken, async (req, res) => {
   try {
     const posts = await Post.find({
       likes: req.user.userId,
     })
       .populate("author", "fullName practiceArea")
+      .populate("comments.user", "fullName") // ✅ populate comment authors
       .sort({ createdAt: -1 })
       .lean();
 
@@ -155,7 +157,7 @@ router.get("/liked/me", verifyToken, async (req, res) => {
 // ====================================
 // DELETE POST (Author Only)
 // ====================================
-router.delete("/:postId", verifyToken, async (req, res) => {
+router.delete("/:postId", lightVerifyToken, async (req, res) => {
   try {
     const { postId } = req.params;
 
@@ -170,7 +172,7 @@ router.delete("/:postId", verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
-    // Delete image from S3
+    // Delete images from S3
     if (post.image_urls && post.image_urls.length > 0) {
       for (const key of post.image_urls) {
         try {
@@ -196,7 +198,7 @@ router.delete("/:postId", verifyToken, async (req, res) => {
 // ====================================
 // LIKE / UNLIKE POST
 // ====================================
-router.put("/:postId/like", verifyToken, likeLimiter, async (req, res) => {
+router.put("/:postId/like", lightVerifyToken, likeLimiter, async (req, res) => {
   try {
     const { postId } = req.params;
 
@@ -239,7 +241,7 @@ router.put("/:postId/like", verifyToken, likeLimiter, async (req, res) => {
 // ====================================
 router.post(
   "/:postId/comment",
-  verifyToken,
+  lightVerifyToken,
   commentLimiter,
   async (req, res) => {
     try {
@@ -250,10 +252,7 @@ router.post(
         return res.status(400).json({ error: "Comment is required" });
       }
 
-      const post = await Post.findById(postId).populate(
-        "author",
-        "fullName practiceArea",
-      );
+      const post = await Post.findById(postId);
 
       if (!post) {
         return res.status(404).json({ error: "Post not found" });
@@ -268,9 +267,23 @@ router.post(
 
       await post.save();
 
+      // ✅ Get the newly added comment (last one) and populate its user
+      const newComment = post.comments[post.comments.length - 1];
+      await post.populate({
+        path: "comments.user",
+        select: "fullName",
+        match: { _id: newComment.user },
+      });
+
+      // ✅ Find the populated version of the new comment
+      const populatedComment = post.comments.find(
+        (c) => c._id.toString() === newComment._id.toString(),
+      );
+
       res.json({
         ok: true,
         commentCount: post.commentCount,
+        comment: populatedComment, // ✅ return full comment with populated user
       });
     } catch (err) {
       console.error("❌ Comment Error:", err);
