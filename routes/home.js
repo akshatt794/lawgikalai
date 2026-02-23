@@ -452,6 +452,8 @@ https://openai.com/policies/privacy-policy
 
 OpenAI is contractually obligated to maintain industry-standard security and confidentiality protections.
 
+OpenAI provides equivalent or greater data protection standards as required under applicable privacy laws, and processes data solely for the purpose of returning a response to LawgikalAI.
+
 AI-generated responses are provided as a productivity tool and do not constitute legal advice.
 
 ## 10. Your Rights
