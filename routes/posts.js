@@ -12,7 +12,22 @@ const { lightVerifyToken } = require("../middleware/lightVerifyToken");
 
 const router = express.Router();
 
-const upload = multer({ storage: multer.memoryStorage() }); // store in memory buffer
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max
+  },
+  fileFilter: (req, file, cb) => {
+    const isImage = file.mimetype.startsWith("image/");
+    const isVideo = file.mimetype.startsWith("video/");
+
+    if (!isImage && !isVideo) {
+      return cb(new Error("Only images or videos allowed"));
+    }
+
+    cb(null, true);
+  },
+}); // store in memory buffer
 
 // ------------------------------------
 // Helper: Delete image from S3
@@ -35,7 +50,10 @@ router.post(
   "/",
   verifyToken,
   createPostLimiter,
-  upload.array("images", 5),
+  upload.fields([
+    { name: "images", maxCount: 5 },
+    { name: "video", maxCount: 1 },
+  ]),
   async (req, res) => {
     try {
       const { content } = req.body;
@@ -48,19 +66,55 @@ router.post(
         return res.status(400).json({ error: "Content too long" });
       }
 
-      let imageKeys = [];
+      const images = req.files?.images || [];
+      const videos = req.files?.video || [];
 
-      if (req.files && req.files.length > 0) {
-        for (const file of req.files) {
-          const key = await uploadToS3(file, "posts");
+      // ❌ Cannot upload both images and video
+      if (images.length > 0 && videos.length > 0) {
+        return res.status(400).json({
+          error: "You can upload either images or one video, not both.",
+        });
+      }
+
+      let imageKeys = [];
+      let videoKey = null;
+
+      // =========================
+      // HANDLE IMAGES
+      // =========================
+      if (images.length > 0) {
+        for (const file of images) {
+          const key = await uploadToS3(file, "posts/images");
           imageKeys.push(key);
         }
+      }
+
+      // =========================
+      // HANDLE VIDEO
+      // =========================
+      if (videos.length > 0) {
+        const videoFile = videos[0];
+
+        // Basic mimetype validation
+        if (!videoFile.mimetype.startsWith("video/")) {
+          return res.status(400).json({ error: "Invalid video format" });
+        }
+
+        // Optional: Restrict to mp4 only
+        if (videoFile.mimetype !== "video/mp4") {
+          return res.status(400).json({
+            error: "Only MP4 videos are allowed",
+          });
+        }
+
+        videoKey = await uploadToS3(videoFile, "posts/videos");
       }
 
       const post = new Post({
         author: req.user.userId,
         content: content.trim(),
         image_urls: imageKeys,
+        video_url: videoKey,
       });
 
       await post.save();
@@ -97,9 +151,10 @@ router.get("/", async (req, res) => {
       .limit(10)
       .lean();
 
-    const postsWithImages = await Promise.all(
+    const postsWithMedia = await Promise.all(
       posts.map(async (p) => {
         let images = [];
+        let video = null;
 
         if (p.image_urls && p.image_urls.length > 0) {
           images = await Promise.all(
@@ -107,13 +162,17 @@ router.get("/", async (req, res) => {
           );
         }
 
-        return { ...p, images };
+        if (p.video_url) {
+          video = await getPresignedUrl(p.video_url);
+        }
+
+        return { ...p, images, video };
       }),
     );
 
     res.json({
       ok: true,
-      posts: postsWithImages,
+      posts: postsWithMedia,
       nextCursor: posts.length > 0 ? posts[posts.length - 1].createdAt : null,
     });
   } catch (err) {
@@ -130,19 +189,26 @@ router.get("/mine", lightVerifyToken, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const postsWithImages = await Promise.all(
+    const postsWithMedia = await Promise.all(
       posts.map(async (p) => {
         let images = [];
+        let video = null;
+
         if (p.image_urls && p.image_urls.length > 0) {
           images = await Promise.all(
             p.image_urls.map((key) => getPresignedUrl(key)),
           );
         }
-        return { ...p, images };
+
+        if (p.video_url) {
+          video = await getPresignedUrl(p.video_url);
+        }
+
+        return { ...p, images, video };
       }),
     );
 
-    res.json({ ok: true, posts: postsWithImages });
+    res.json({ ok: true, posts: postsWithMedia });
   } catch (err) {
     console.error("❌ Fetch My Posts Error:", err);
     res.status(500).json({ error: "Server error" });
@@ -162,9 +228,10 @@ router.get("/liked/me", lightVerifyToken, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const postsWithImages = await Promise.all(
+    const postsWithMedia = await Promise.all(
       posts.map(async (p) => {
         let images = [];
+        let video = null;
 
         if (p.image_urls && p.image_urls.length > 0) {
           images = await Promise.all(
@@ -172,11 +239,15 @@ router.get("/liked/me", lightVerifyToken, async (req, res) => {
           );
         }
 
-        return { ...p, images };
+        if (p.video_url) {
+          video = await getPresignedUrl(p.video_url);
+        }
+
+        return { ...p, images, video };
       }),
     );
 
-    res.json({ ok: true, posts: postsWithImages });
+    res.json({ ok: true, posts: postsWithMedia });
   } catch (err) {
     console.error("❌ Fetch Liked Posts Error:", err);
     res.status(500).json({ error: "Server error" });
@@ -209,6 +280,15 @@ router.delete("/:postId", lightVerifyToken, async (req, res) => {
         } catch (err) {
           console.warn("⚠️ Failed to delete image:", err.message);
         }
+      }
+    }
+
+    // Delete video
+    if (post.video_url) {
+      try {
+        await deleteFromS3(post.video_url);
+      } catch (err) {
+        console.warn("⚠️ Failed to delete video:", err.message);
       }
     }
 
