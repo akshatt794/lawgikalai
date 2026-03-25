@@ -67,7 +67,7 @@ router.get("/by-name", async (req, res) => {
 
     const regex = new RegExp(name.trim(), "i"); // case-insensitive match
 
-    const judges = await Judge.find({ name: regex }).sort({
+    const judges = await Judge.find({ $or: [{ name: regex }, {court_room: regex}] }).sort({
       createdAt: 1,
     });
 

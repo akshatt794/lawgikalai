@@ -49,7 +49,6 @@ const deleteFromS3 = async (key) => {
 router.post(
   "/",
   verifyToken,
-  createPostLimiter,
   upload.fields([
     { name: "images", maxCount: 5 },
     { name: "video", maxCount: 1 },
