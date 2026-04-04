@@ -3,13 +3,6 @@
  * grant-plan.js
  * 
  * CLI tool to grant subscription plans to users by email
- * 
- * Usage:
- *   node scripts/grant-plan.js <email> <plan> <duration>
- * 
- * Examples:
- *   node scripts/grant-plan.js user@example.com starter
- *   node scripts/grant-plan.js user@example.com premium
  */
 
 require("dotenv").config();
@@ -17,7 +10,7 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Transaction = require("../models/transaction");
 
-// ─── Color codes for terminal output ──────────────────────────────────────────
+// ─── Colors ────────────────────────────────────────────────────────────────────
 const colors = {
   reset: "\x1b[0m",
   bright: "\x1b[1m",
@@ -52,32 +45,26 @@ const PLAN_PRESETS = {
 function parseDurationInMonths(durationStr) {
   if (!durationStr) return 1;
   const s = String(durationStr).toLowerCase().trim();
-
-  // numeric match
   const numMatch = s.match(/(\d{1,2})/);
   if (numMatch) {
     const n = parseInt(numMatch[1], 10);
     if (s.includes("year") && n === 1) return 12;
     return n;
   }
-
-  // fallback checks
   if (s.includes("1 month")) return 1;
   if (s.includes("3 months")) return 3;
   if (s.includes("6 months")) return 6;
   if (s.includes("12 months") || s.includes("1 year")) return 12;
-
   return 1;
 }
 
-// ─── Safe month addition (preserves day or falls back to month-end) ───────────
+// ─── Safe month addition ───────────────────────────────────────────────────────
 function addMonthsSafe(date, months) {
   const d = new Date(date.getTime());
   const day = d.getDate();
   d.setMonth(d.getMonth() + months);
-
   if (d.getDate() < day) {
-    d.setDate(0); // last day of previous month
+    d.setDate(0);
   }
   return d;
 }
@@ -85,21 +72,57 @@ function addMonthsSafe(date, months) {
 // ─── Main grant function ───────────────────────────────────────────────────────
 async function grantPlan(email, planInput, durationInput) {
   try {
-    // ── Connect to MongoDB ─────────────────────────────────────────────────────
     log(`\n🔌 Connecting to MongoDB...`, "cyan");
-    await mongoose.connect(process.env.DOCUMENTDB_URI);
+    await mongoose.connect(process.env.MONGO_URI);
     log(`✅ Connected to MongoDB\n`, "green");
 
-    // ── Find user by email ─────────────────────────────────────────────────────
+    // ── Find user - try multiple approaches ───────────────────────────────────
+    const emailNormalized = email.toLowerCase().trim();
     log(`🔍 Searching for user: ${email}`, "cyan");
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    log(`   Normalized email: ${emailNormalized}`, "gray");
 
+    // Try exact match first
+    let user = await User.findOne({ email: emailNormalized });
+
+    // If not found, try case-insensitive regex
     if (!user) {
-      log(`❌ User not found with email: ${email}`, "red");
+      log(
+        `   ⚠️  Exact match failed, trying case-insensitive search...`,
+        "yellow",
+      );
+      user = await User.findOne({
+        email: { $regex: new RegExp(`^${emailNormalized}$`, "i") },
+      });
+    }
+
+    // If still not found, try by mobileNumber (in case email is the phone)
+    if (!user && email.match(/^\+?\d+$/)) {
+      log(`   ⚠️  Trying to search by mobile number...`, "yellow");
+      user = await User.findOne({ mobileNumber: email });
+    }
+
+    // If still not found, list all users with similar email (debugging)
+    if (!user) {
+      const similarUsers = await User.find({
+        email: { $regex: emailNormalized.split("@")[0], $options: "i" },
+      })
+        .limit(5)
+        .select("email fullName _id");
+
+      if (similarUsers.length > 0) {
+        log(`\n   💡 Did you mean one of these?`, "yellow");
+        similarUsers.forEach((u) => {
+          log(`      ${u.email} (${u.fullName})`, "gray");
+        });
+      }
+
+      log(`\n❌ User not found with email: ${email}`, "red");
+      log(`   Searched normalized: ${emailNormalized}`, "gray");
       process.exit(1);
     }
 
     log(`✅ User found: ${user.fullName} (${user._id})`, "green");
+    log(`   Email in DB: ${user.email}`, "gray");
     log(`   Current plan: ${user.plan?.name || "None"}`, "gray");
     if (user.plan?.endDate) {
       const expiry = new Date(user.plan.endDate);
@@ -113,7 +136,6 @@ async function grantPlan(email, planInput, durationInput) {
     // ── Resolve plan details ───────────────────────────────────────────────────
     let planName, duration, months;
 
-    // Check if planInput is a preset key
     const preset = PLAN_PRESETS[planInput.toLowerCase()];
     if (preset) {
       planName = preset.name;
@@ -124,7 +146,6 @@ async function grantPlan(email, planInput, durationInput) {
         "yellow",
       );
     } else {
-      // Custom plan
       planName = planInput;
       duration = durationInput || "1 Month";
       months = parseDurationInMonths(duration);
@@ -143,23 +164,24 @@ async function grantPlan(email, planInput, durationInput) {
     log(`   Duration: ${months} month(s)`, "gray");
 
     // ── Update user plan ───────────────────────────────────────────────────────
-    // ✅ Don't set source field — let it use the model's default or omit it entirely
     user.plan = {
       name: planName,
       duration: duration,
       startDate: start,
       endDate: end,
-      // source field omitted — only set if your User model allows it
+      source: "ADMIN", // ✅ Use "ADMIN" (matches your enum)
+      platform: "web", // ✅ Default to web for admin grants
     };
 
     await user.save();
+    log(`✅ User plan saved to database`, "green");
 
     // ── Create transaction record ──────────────────────────────────────────────
     const transaction = new Transaction({
       userId: user._id,
       planName: planName,
       duration: duration,
-      amount: 0, // admin grant = free
+      amount: 0,
       status: "success",
       paymentGateway: "Admin",
       merchantTransactionId: `ADMIN-${Date.now()}`,
@@ -167,6 +189,7 @@ async function grantPlan(email, planInput, durationInput) {
     });
 
     await transaction.save();
+    log(`✅ Transaction record created`, "green");
 
     // ── Success ────────────────────────────────────────────────────────────────
     log(`\n✅ Plan granted successfully!`, "green");
@@ -197,40 +220,24 @@ if (args.length < 2) {
   log(`  node scripts/grant-plan.js <email> <plan> [duration]\n`, "cyan");
 
   log(`Examples:`, "yellow");
-  log(`  # Using presets (recommended):`, "gray");
   log(`  node scripts/grant-plan.js user@example.com starter`, "cyan");
   log(`  node scripts/grant-plan.js user@example.com litigator`, "cyan");
   log(`  node scripts/grant-plan.js user@example.com power`, "cyan");
   log(`  node scripts/grant-plan.js user@example.com premium`, "cyan");
 
-  log(`\n  # Custom plan:`, "gray");
-  log(
-    `  node scripts/grant-plan.js user@example.com "Custom Plan" "6 Months"`,
-    "cyan",
-  );
-  log(
-    `  node scripts/grant-plan.js user@example.com "VIP Access" 12\n`,
-    "cyan",
-  );
-
-  log(`Available presets:`, "yellow");
+  log(`\nAvailable presets:`, "yellow");
   Object.entries(PLAN_PRESETS).forEach(([key, preset]) => {
     log(`  ${key.padEnd(12)} → ${preset.name} (${preset.duration})`, "gray");
   });
-
-  log(`\nEnvironment:`, "yellow");
-  log(`  Make sure MONGO_URI is set in your .env file\n`, "gray");
 
   process.exit(0);
 }
 
 const [email, plan, duration] = args;
 
-// Validate email format
 if (!email.includes("@")) {
   log(`\n❌ Invalid email format: ${email}`, "red");
   process.exit(1);
 }
 
-// Run
 grantPlan(email, plan, duration);
