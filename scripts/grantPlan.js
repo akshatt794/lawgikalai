@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 /**
  * grant-plan.js
- *
+ * 
  * CLI tool to grant subscription plans to users by email
- *
+ * 
  * Usage:
  *   node scripts/grant-plan.js <email> <plan> <duration>
- *
+ * 
  * Examples:
- *   node scripts/grant-plan.js user@example.com "Advocate Starter Plan" "1 Month"
- *   node scripts/grant-plan.js user@example.com "LawgikalAI Enterprise Premium" "12 Months"
- *   node scripts/grant-plan.js user@example.com premium 12
+ *   node scripts/grant-plan.js user@example.com starter
+ *   node scripts/grant-plan.js user@example.com premium
  */
 
 require("dotenv").config();
@@ -88,10 +87,7 @@ async function grantPlan(email, planInput, durationInput) {
   try {
     // ── Connect to MongoDB ─────────────────────────────────────────────────────
     log(`\n🔌 Connecting to MongoDB...`, "cyan");
-    await mongoose.connect(process.env.DOCUMENTDB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(process.env.DOCUMENTDB_URI);
     log(`✅ Connected to MongoDB\n`, "green");
 
     // ── Find user by email ─────────────────────────────────────────────────────
@@ -147,12 +143,13 @@ async function grantPlan(email, planInput, durationInput) {
     log(`   Duration: ${months} month(s)`, "gray");
 
     // ── Update user plan ───────────────────────────────────────────────────────
+    // ✅ Don't set source field — let it use the model's default or omit it entirely
     user.plan = {
       name: planName,
       duration: duration,
       startDate: start,
       endDate: end,
-      source: "ADMIN_GRANT", // track that this was manually granted
+      // source field omitted — only set if your User model allows it
     };
 
     await user.save();
