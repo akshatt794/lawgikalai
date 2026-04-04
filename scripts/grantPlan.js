@@ -88,7 +88,7 @@ async function grantPlan(email, planInput, durationInput) {
   try {
     // ── Connect to MongoDB ─────────────────────────────────────────────────────
     log(`\n🔌 Connecting to MongoDB...`, "cyan");
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(process.env.DOCUMENTDB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
