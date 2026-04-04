@@ -73,7 +73,7 @@ function addMonthsSafe(date, months) {
 async function grantPlan(email, planInput, durationInput) {
   try {
     log(`\n🔌 Connecting to MongoDB...`, "cyan");
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.DOCUMENTDB_URI);
     log(`✅ Connected to MongoDB\n`, "green");
 
     // ── Find user - try multiple approaches ───────────────────────────────────
