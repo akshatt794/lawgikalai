@@ -161,7 +161,7 @@ async function grantPlan(email, planInput, durationInput) {
       duration: duration,
       amount: 0, // admin grant = free
       status: "success",
-      paymentGateway: "Admin Grant",
+      paymentGateway: "Admin",
       merchantTransactionId: `ADMIN-${Date.now()}`,
       completedAt: new Date(),
     });
