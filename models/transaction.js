@@ -16,7 +16,7 @@ const transactionSchema = new mongoose.Schema({
   duration: String,
   paymentGateway: {
     type: String,
-    enum: ["PhonePe", "Apple", "GooglePlay"],
+    enum: ["PhonePe", "Apple", "GooglePlay", "Admin"],
     default: "PhonePe",
   },
   transactionId: String, // from PhonePe
