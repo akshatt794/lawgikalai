@@ -1,3 +1,6 @@
+// routes/mobilepayment.js
+// ✅ FIXED - Based on PhonePe Official Documentation
+
 const express = require("express");
 const { randomUUID } = require("crypto");
 const {
@@ -21,10 +24,10 @@ const phonePeClient = StandardCheckoutClient.getInstance(
   PHONEPE_CLIENT_ID,
   PHONEPE_CLIENT_SECRET,
   PHONEPE_CLIENT_VERSION,
-  process.env.NODE_ENV === "production" ? Env.PRODUCTION : Env.SANDBOX
+  process.env.NODE_ENV === "production" ? Env.PRODUCTION : Env.SANDBOX,
 );
 
-// Helper functions for duration
+// Helper functions
 function addMonthsSafe(date, months) {
   const d = new Date(date);
   const day = d.getDate();
@@ -75,14 +78,13 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
       status: "pending",
     });
 
-    const redirectUrl = `lawgikalai://payment/status?txnId=${txn._id}`; // deep link
+    const redirectUrl = `lawgikalai://payment/payment-redirect?txnId=${txn._id}`;
 
     const metaInfo = MetaInfo.builder()
       .udf1(user._id.toString())
       .udf2(planName)
       .build();
 
-    // ⭐ Correct PhonePe SDK Order Request Builder
     const request = CreateSdkOrderRequest.StandardCheckoutBuilder()
       .merchantOrderId(merchantOrderId)
       .amount(amountInPaise)
@@ -90,22 +92,24 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
       .metaInfo(metaInfo)
       .build();
 
-    // ⭐ Correct function to call (NOT createOrder)
+    // ✅ createSdkOrder returns { token: string, orderId: string }
     const response = await phonePeClient.createSdkOrder(request);
 
-    if (!response?.token) {
+    if (!response || !response.token) {
+      console.error("PhonePe SDK Order failed:", response);
       return res.status(500).json({
         success: false,
         error: "Failed to create PhonePe SDK order",
-        details: response,
       });
     }
 
+    // ✅ Return the token AND the checksum (if provided by PhonePe)
     res.json({
       success: true,
-      txnId: txn._id,
+      txnId: txn._id.toString(),
       orderId: merchantOrderId,
-      token: response.token, // Use this token in RN SDK
+      token: response.token, // Base64 token string
+      checksum: response.checksum || null, // Checksum if available
       redirectUrl,
     });
   } catch (error) {
@@ -113,6 +117,7 @@ router.post("/mobile/initiate", lightVerifyToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to initiate mobile PhonePe order",
+      error: error.message,
     });
   }
 });
@@ -128,7 +133,6 @@ router.post("/mobile/verify", lightVerifyToken, async (req, res) => {
       return res.status(400).json({ error: "Transaction ID required" });
 
     const txn = await Transaction.findById(txnId);
-
     if (!txn) return res.status(404).json({ error: "Transaction not found" });
 
     if (txn.status === "success") {
@@ -158,7 +162,6 @@ router.post("/mobile/verify", lightVerifyToken, async (req, res) => {
         : null;
 
       const startDate = previousEnd > now ? previousEnd : now;
-
       const months = parseDurationInMonths(txn.duration);
       const endDate = addMonthsSafe(startDate, months);
 
@@ -168,6 +171,7 @@ router.post("/mobile/verify", lightVerifyToken, async (req, res) => {
         startDate,
         endDate,
         source: "PHONEPE",
+        platform: "android",
       };
 
       await user.save();

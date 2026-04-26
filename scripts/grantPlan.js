@@ -82,7 +82,7 @@ async function grantPlan(email, planInput, durationInput) {
     log(`   Normalized email: ${emailNormalized}`, "gray");
 
     // Try exact match first
-    let user = await User.findOne({ email: emailNormalized });
+    let user = await User.findOne({ identifier: emailNormalized });
 
     // If not found, try case-insensitive regex
     if (!user) {
