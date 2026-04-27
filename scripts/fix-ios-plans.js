@@ -24,7 +24,7 @@ const productMap = { ...expoIAPMap, ...revenueCatMap };
 async function fixIOSPlans() {
   try {
     console.log("\n🔌 Connecting to MongoDB...");
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.DOCUMENTDB_URI);
     console.log("✅ Connected\n");
 
     // Find users with iOS plans that have productId instead of plan name
