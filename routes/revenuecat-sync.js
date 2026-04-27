@@ -1,5 +1,5 @@
 // routes/revenuecat-sync.js
-// ✅ FIXED - iOS ONLY - RevenueCat subscription sync
+// ✅ FIXED - Handles trial → paid subscription upgrades
 
 const express = require("express");
 const router = express.Router();
@@ -37,6 +37,8 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
       userId: req.user.userId,
       productId,
       transactionId,
+      isTrialPeriod,
+      expirationDate,
     });
 
     // Get user
@@ -75,9 +77,16 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
       });
     }
 
-    // Check if we already processed this transaction
-    if (user.plan?.transactionId === transactionId) {
-      console.log("[RevenueCat iOS] Transaction already processed");
+    // ✅ FIX: Check if we should update (compare expiration dates, not just transaction ID)
+    const shouldUpdate =
+      !user.plan?.transactionId || // No previous sync
+      user.plan.transactionId !== transactionId || // Different transaction
+      (user.plan.endDate &&
+        new Date(user.plan.endDate).getTime() !==
+          new Date(expirationDate).getTime()); // Dates changed (trial → paid)
+
+    if (!shouldUpdate) {
+      console.log("[RevenueCat iOS] Already synced with same data");
       return res.json({
         success: true,
         message: "Already synced",
@@ -85,24 +94,46 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
       });
     }
 
-    // Create transaction record
-    const transaction = await Transaction.create({
+    // Log if this is an upgrade from trial
+    if (
+      user.plan?.isTrialPeriod === true &&
+      isTrialPeriod === false &&
+      user.plan.transactionId === transactionId
+    ) {
+      console.log(
+        "[RevenueCat iOS] ✅ Upgrading from trial to paid subscription",
+      );
+    }
+
+    // Create transaction record (only if new transaction or trial → paid upgrade)
+    const existingTransaction = await Transaction.findOne({
       userId: user._id,
-      planName: productInfo.planName,
-      duration: productInfo.duration,
-      paymentGateway: "Apple",
       appleTransactionId: transactionId,
-      appleOriginalTransactionId: originalTransactionId,
-      appleProductId: productId,
-      status: isActive ? "success" : "pending",
-      completedAt: isActive ? new Date() : null,
     });
 
-    console.log("[RevenueCat iOS] Transaction created:", transaction._id);
+    if (!existingTransaction) {
+      const transaction = await Transaction.create({
+        userId: user._id,
+        planName: productInfo.planName,
+        duration: productInfo.duration,
+        paymentGateway: "Apple",
+        appleTransactionId: transactionId,
+        appleOriginalTransactionId: originalTransactionId,
+        appleProductId: productId,
+        status: isActive ? "success" : "pending",
+        completedAt: isActive ? new Date() : null,
+      });
 
-    // ✅ CRITICAL FIX: Save full plan name, not product ID
+      console.log("[RevenueCat iOS] Transaction created:", transaction._id);
+    } else {
+      console.log(
+        "[RevenueCat iOS] Transaction exists, updating user plan only",
+      );
+    }
+
+    // ✅ ALWAYS UPDATE USER PLAN (even if transaction exists)
     user.plan = {
-      name: productInfo.planName, // ← WAS: productId, NOW: productInfo.planName
+      name: productInfo.planName,
       duration: productInfo.duration,
       startDate: new Date(purchaseDate),
       endDate: new Date(expirationDate),
@@ -118,22 +149,28 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
 
     await user.save();
 
-    console.log("[RevenueCat iOS] User plan updated:", {
+    console.log("[RevenueCat iOS] ✅ User plan updated:", {
       planName: user.plan.name,
+      startDate: user.plan.startDate,
       endDate: user.plan.endDate,
       isActive: user.plan.isActive,
+      isTrialPeriod: user.plan.isTrialPeriod,
     });
 
     res.json({
       success: true,
-      message: "iOS subscription synced successfully",
+      message: isTrialPeriod
+        ? "Trial subscription synced"
+        : "Paid subscription synced",
       plan: {
         name: productInfo.planName,
         productId: productId,
         platform: "ios",
+        startsDate: purchaseDate,
         expiresDate: expirationDate,
         isActive: isActive,
         willAutoRenew: willRenew,
+        isTrialPeriod: isTrialPeriod,
       },
     });
   } catch (err) {
@@ -169,12 +206,19 @@ router.get("/status", lightVerifyToken, async (req, res) => {
     const endDate = user.plan.endDate ? new Date(user.plan.endDate) : null;
     const isActive = endDate ? endDate > now : false;
 
+    console.log("[RevenueCat iOS Status]", {
+      userId: req.user.userId,
+      planName: user.plan.name,
+      endDate: endDate?.toISOString(),
+      isActive,
+    });
+
     res.json({
       success: true,
       hasSubscription: isActive,
       platform: user.plan.platform || "ios",
       subscription: {
-        productId: user.plan.name, // Full plan name
+        productId: user.plan.name,
         startDate: user.plan.startDate,
         expiresDate: user.plan.endDate,
         isActive: isActive,
