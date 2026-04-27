@@ -1,5 +1,5 @@
 // routes/revenuecat-sync.js
-// ✅ iOS ONLY - RevenueCat subscription sync
+// ✅ FIXED - iOS ONLY - RevenueCat subscription sync
 
 const express = require("express");
 const router = express.Router();
@@ -22,7 +22,7 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
       isActive,
       willRenew,
       isTrialPeriod,
-      platform, // ← Should be "ios"
+      platform,
     } = req.body;
 
     // ✅ ONLY ACCEPT iOS REQUESTS
@@ -33,10 +33,11 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
       });
     }
 
-    console.log(
-      "[RevenueCat iOS] Syncing subscription for user:",
-      req.user.userId,
-    );
+    console.log("[RevenueCat iOS] Syncing subscription:", {
+      userId: req.user.userId,
+      productId,
+      transactionId,
+    });
 
     // Get user
     const user = await User.findById(req.user.userId);
@@ -70,7 +71,7 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
     if (!productInfo) {
       return res.status(400).json({
         success: false,
-        error: "Invalid iOS product ID",
+        error: `Invalid iOS product ID: ${productId}`,
       });
     }
 
@@ -89,7 +90,7 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
       userId: user._id,
       planName: productInfo.planName,
       duration: productInfo.duration,
-      paymentGateway: "Apple", // ✅ iOS = Apple
+      paymentGateway: "Apple",
       appleTransactionId: transactionId,
       appleOriginalTransactionId: originalTransactionId,
       appleProductId: productId,
@@ -99,14 +100,14 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
 
     console.log("[RevenueCat iOS] Transaction created:", transaction._id);
 
-    // Update user's plan
+    // ✅ CRITICAL FIX: Save full plan name, not product ID
     user.plan = {
-      name: productId,
+      name: productInfo.planName, // ← WAS: productId, NOW: productInfo.planName
       duration: productInfo.duration,
       startDate: new Date(purchaseDate),
       endDate: new Date(expirationDate),
-      source: "REVENUECAT_IOS", // ✅ Explicitly mark as iOS
-      platform: "ios", // ✅ Track platform
+      source: "REVENUECAT_IOS",
+      platform: "ios",
       transactionId: transactionId,
       originalTransactionId: originalTransactionId,
       isActive: isActive,
@@ -117,7 +118,11 @@ router.post("/sync", lightVerifyToken, async (req, res) => {
 
     await user.save();
 
-    console.log("[RevenueCat iOS] User plan updated successfully");
+    console.log("[RevenueCat iOS] User plan updated:", {
+      planName: user.plan.name,
+      endDate: user.plan.endDate,
+      isActive: user.plan.isActive,
+    });
 
     res.json({
       success: true,
@@ -151,8 +156,8 @@ router.get("/status", lightVerifyToken, async (req, res) => {
       return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    // ✅ Only return iOS subscriptions
-    if (!user.plan || user.plan.platform !== "ios") {
+    // Check if user has ANY active plan
+    if (!user.plan || !user.plan.name) {
       return res.json({
         success: true,
         hasSubscription: false,
@@ -161,14 +166,15 @@ router.get("/status", lightVerifyToken, async (req, res) => {
     }
 
     const now = new Date();
-    const isActive = user.plan.endDate > now;
+    const endDate = user.plan.endDate ? new Date(user.plan.endDate) : null;
+    const isActive = endDate ? endDate > now : false;
 
     res.json({
       success: true,
-      hasSubscription: true,
-      platform: "ios",
+      hasSubscription: isActive,
+      platform: user.plan.platform || "ios",
       subscription: {
-        productId: user.plan.name,
+        productId: user.plan.name, // Full plan name
         startDate: user.plan.startDate,
         expiresDate: user.plan.endDate,
         isActive: isActive,
