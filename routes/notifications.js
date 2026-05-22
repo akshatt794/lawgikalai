@@ -103,23 +103,34 @@ async function sendExpoNotifications(tokens, title, body, dataPayload) {
 
 // ✅ Helper: Send notification to all users
 async function sendNotificationToAllUsers(title, body, meta) {
-  const users = await User.find({
-    $or: [
-      { "pushTokens.web.0": { $exists: true } },
-      { "pushTokens.expo.0": { $exists: true } },
-    ],
-  });
-
-  const webTokens = users.flatMap((u) => u.pushTokens.web || []);
-  const expoTokens = users.flatMap((u) => u.pushTokens.expo || []);
-
-  const dataPayload = {
-    type: meta.type,
-    entityId: meta.entityId.toString(),
-  };
-
   try {
+    console.log("🔍 Starting sendNotificationToAllUsers...");
+    console.log("Meta:", meta);
+
+    const users = await User.find({
+      $or: [
+        { "pushTokens.web.0": { $exists: true } },
+        { "pushTokens.expo.0": { $exists: true } },
+      ],
+    });
+
+    console.log(`👥 Found ${users.length} users with push tokens`);
+
+    const webTokens = users.flatMap((u) => u.pushTokens.web || []);
+    const expoTokens = users.flatMap((u) => u.pushTokens.expo || []);
+
+    console.log(
+      `📱 Web tokens: ${webTokens.length}, Expo tokens: ${expoTokens.length}`,
+    );
+
+    const dataPayload = {
+      type: meta.type,
+      entityId: meta.entityId.toString(),
+    };
+
+    // Send Firebase notifications
     if (webTokens.length) {
+      console.log("🔥 Sending Firebase notifications...");
       const chunkSize = 500;
 
       for (let i = 0; i < webTokens.length; i += chunkSize) {
@@ -132,33 +143,53 @@ async function sendNotificationToAllUsers(title, body, meta) {
             data: dataPayload,
           });
 
-          console.log("✅ Firebase sent:", response.successCount);
+          console.log(
+            `✅ Firebase sent: ${response.successCount}/${chunk.length}`,
+          );
+
+          if (response.failureCount > 0) {
+            console.log(`⚠️ Firebase failures: ${response.failureCount}`);
+            response.responses.forEach((resp, idx) => {
+              if (!resp.success) {
+                console.error(`Failed token ${idx}:`, resp.error?.message);
+              }
+            });
+          }
         } catch (err) {
           console.error("❌ Firebase multicast error:", err.message);
+          console.error("Full error:", err);
         }
       }
     }
+
+    // Send Expo notifications
+    if (expoTokens.length) {
+      console.log("📲 Sending Expo notifications...");
+      try {
+        await sendExpoNotifications(expoTokens, title, body, dataPayload);
+      } catch (error) {
+        console.error("❌ Expo notification error:", error.message);
+        console.error("Full error:", error);
+      }
+    }
+
+    // Save notifications to database
+    console.log("💾 Saving notifications to database...");
+    await Notification.insertMany(
+      users.map((u) => ({
+        userId: u._id,
+        title,
+        body,
+        type: meta.type,
+        entityId: meta.entityId,
+      })),
+    );
+    console.log("✅ Notifications saved to database");
   } catch (error) {
     console.error("❌ sendNotificationToAllUsers Error:", error.message);
+    console.error("Full error:", error);
+    throw error; // Re-throw to be caught by the caller
   }
-
-  try {
-    if (expoTokens.length) {
-      await sendExpoNotifications(expoTokens, title, body, dataPayload);
-    }
-  } catch (error) {
-    console.error("❌ sendNotificationToAllUsers Expo Error:", error.message);
-  }
-
-  await Notification.insertMany(
-    users.map((u) => ({
-      userId: u._id,
-      title,
-      body,
-      type: meta.type,
-      entityId: meta.entityId,
-    })),
-  );
 }
 
 // ✅ Send notification to a single logged-in user
