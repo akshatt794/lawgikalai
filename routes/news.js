@@ -44,15 +44,20 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     });
 
     await news.save();
-    // ✅ Broadcast notification to all users
-    sendNotificationToAllUsers(
-      `📰 Latest News: ${title}`,
-      content.slice(0, 80) + "...",
-      {
-        type: "news",
-        entityId: news._id,
-      },
-    );
+    try {
+      // ✅ Broadcast notification to all users
+      await sendNotificationToAllUsers(
+        `📰 Latest News: ${title}`,
+        content.slice(0, 80) + "...",
+        {
+          type: "news",
+          entityId: news._id,
+        },
+      );
+    } catch (notifError) {
+      console.error("❌ Notification Error:", notifError.message);
+    }
+    
 
     res.status(201).json({
       ok: true,
